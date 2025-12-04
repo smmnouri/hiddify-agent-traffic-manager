@@ -4,11 +4,32 @@ Admin interface extension for agent traffic management
 from flask_admin import expose
 from flask_babel import gettext as _
 from loguru import logger
+from wtforms import DecimalField
+from markupsafe import Markup
 
 from hiddifypanel.models.admin import AdminUser, AdminMode
 from hiddifypanel.panel.admin.adminlte import AdminLTEMixin
 from ..utils.traffic_calculator import AgentTrafficCalculator
 from ..utils.traffic_checker import AgentTrafficChecker
+
+ONE_GIG = 1024 * 1024 * 1024
+
+
+class TrafficLimitField(DecimalField):
+    """Custom field for traffic limit in GB"""
+    def process_data(self, value):
+        if value is not None:
+            # value is in bytes, convert to GB
+            self.data = value / ONE_GIG
+        else:
+            self.data = None
+
+    def process_formdata(self, valuelist):
+        if valuelist and valuelist[0]:
+            # Convert GB to bytes
+            self.data = int(float(valuelist[0]) * ONE_GIG)
+        else:
+            self.data = None
 
 
 def extend_admin_user_view(admin_view):
@@ -16,32 +37,61 @@ def extend_admin_user_view(admin_view):
     
     try:
         # Add traffic limit field to form
-        original_form_columns = admin_view.form_columns
+        original_form_columns = list(admin_view.form_columns) if admin_view.form_columns else []
         
-        if original_form_columns:
-            if 'traffic_limit_GB' not in original_form_columns:
-                admin_view.form_columns = list(original_form_columns) + ['traffic_limit_GB']
-        else:
-            admin_view.form_columns = ['traffic_limit_GB']
+        if 'traffic_limit_GB' not in original_form_columns:
+            # Add after max_active_users or max_users
+            if 'max_active_users' in original_form_columns:
+                idx = original_form_columns.index('max_active_users') + 1
+                original_form_columns.insert(idx, 'traffic_limit_GB')
+            elif 'max_users' in original_form_columns:
+                idx = original_form_columns.index('max_users') + 1
+                original_form_columns.insert(idx, 'traffic_limit_GB')
+            else:
+                original_form_columns.append('traffic_limit_GB')
+            
+            admin_view.form_columns = original_form_columns
+            logger.debug("Added traffic_limit_GB to form_columns")
     except Exception as e:
-        from loguru import logger
         logger.warning(f"Could not add traffic_limit_GB to form_columns: {e}")
     
     try:
         # Add traffic limit and traffic info to column list
-        original_column_list = admin_view.column_list
+        original_column_list = list(admin_view.column_list) if admin_view.column_list else []
         
-        if original_column_list:
-            # Add traffic columns if not already present
-            traffic_columns = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
-            for col in traffic_columns:
-                if col not in original_column_list:
-                    admin_view.column_list = list(original_column_list) + [col]
-        else:
-            admin_view.column_list = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+        # Add traffic columns if not already present
+        traffic_columns = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+        for col in traffic_columns:
+            if col not in original_column_list:
+                original_column_list.append(col)
+        
+        admin_view.column_list = original_column_list
+        logger.debug("Added traffic columns to column_list")
     except Exception as e:
-        from loguru import logger
         logger.warning(f"Could not add traffic columns to column_list: {e}")
+    
+    # Add form override for traffic_limit_GB
+    try:
+        if not hasattr(admin_view, 'form_overrides'):
+            admin_view.form_overrides = {}
+        admin_view.form_overrides['traffic_limit_GB'] = TrafficLimitField
+        logger.debug("Added TrafficLimitField to form_overrides")
+    except Exception as e:
+        logger.warning(f"Could not add TrafficLimitField to form_overrides: {e}")
+    
+    # Add column labels
+    try:
+        if not hasattr(admin_view, 'column_labels'):
+            admin_view.column_labels = {}
+        admin_view.column_labels.update({
+            'traffic_limit_GB': _('Traffic Limit (GB)'),
+            'total_traffic': _('Total Traffic (GB)'),
+            'remaining_traffic': _('Remaining Traffic (GB)'),
+            'traffic_status': _('Traffic Status')
+        })
+        logger.debug("Added traffic column labels")
+    except Exception as e:
+        logger.warning(f"Could not add column labels: {e}")
     
     # Add custom column formatters
     def _format_traffic_limit(view, context, model, name):
@@ -49,85 +99,146 @@ def extend_admin_user_view(admin_view):
         if model.mode != AdminMode.agent:
             return '-'
         
-        limit = model.traffic_limit_GB
-        if limit is None:
-            return _('Unlimited')
-        return f"{limit:.2f} GB"
+        try:
+            limit = model.traffic_limit_GB
+            if limit is None:
+                return Markup('<span class="badge badge-info">' + _('Unlimited') + '</span>')
+            return f"{limit:.2f} GB"
+        except Exception as e:
+            logger.debug(f"Error formatting traffic_limit: {e}")
+            return '-'
     
     def _format_total_traffic(view, context, model, name):
         """Format total traffic column"""
         if model.mode != AdminMode.agent:
             return '-'
         
-        total = model.get_total_traffic_GB()
-        return f"{total:.2f} GB"
+        try:
+            total = model.get_total_traffic_GB()
+            return f"{total:.2f} GB"
+        except Exception as e:
+            logger.debug(f"Error formatting total_traffic: {e}")
+            return '-'
     
     def _format_remaining_traffic(view, context, model, name):
         """Format remaining traffic column"""
         if model.mode != AdminMode.agent:
             return '-'
         
-        remaining = model.get_remaining_traffic_GB()
-        if remaining is None:
+        try:
+            remaining = model.get_remaining_traffic_GB()
+            if remaining is None:
+                return Markup('<span class="badge badge-info">' + _('Unlimited') + '</span>')
+            return f"{remaining:.2f} GB"
+        except Exception as e:
+            logger.debug(f"Error formatting remaining_traffic: {e}")
             return '-'
-        return f"{remaining:.2f} GB"
     
     def _format_traffic_status(view, context, model, name):
-        """Format traffic status column"""
+        """Format traffic status column with progress bar"""
         if model.mode != AdminMode.agent:
             return '-'
         
-        if model.traffic_limit_GB is None:
-            return '<span class="badge badge-info">No Limit</span>'
-        
-        is_exceeded = model.is_traffic_limit_exceeded()
-        usage_percent = (model.get_total_traffic_GB() / model.traffic_limit_GB) * 100
-        
-        if is_exceeded:
-            return f'<span class="badge badge-danger">Exceeded ({usage_percent:.1f}%)</span>'
-        elif usage_percent > 90:
-            return f'<span class="badge badge-warning">Warning ({usage_percent:.1f}%)</span>'
-        else:
-            return f'<span class="badge badge-success">OK ({usage_percent:.1f}%)</span>'
+        try:
+            if not hasattr(model, 'traffic_limit_GB') or model.traffic_limit_GB is None:
+                return Markup('<span class="badge badge-info">' + _('No Limit') + '</span>')
+            
+            total_gb = model.get_total_traffic_GB()
+            limit_gb = model.traffic_limit_GB
+            usage_percent = min((total_gb / limit_gb) * 100, 100) if limit_gb > 0 else 0
+            
+            is_exceeded = model.is_traffic_limit_exceeded()
+            
+            if is_exceeded:
+                color = "#ff7e7e"
+                badge_class = "badge-danger"
+                status_text = _('Exceeded')
+            elif usage_percent > 90:
+                color = "#ffc107"
+                badge_class = "badge-warning"
+                status_text = _('Warning')
+            else:
+                color = "#9ee150"
+                badge_class = "badge-success"
+                status_text = _('OK')
+            
+            return Markup(f"""
+            <div class="progress progress-lg position-relative" style="min-width: 100px;">
+              <div class="progress-bar progress-bar-striped" role="progressbar" style="width: {usage_percent:.1f}%;background-color: {color};" aria-valuenow="{usage_percent:.1f}" aria-valuemin="0" aria-valuemax="100"></div>
+              <span class='badge position-absolute {badge_class}' style="left:auto;right:auto;width: 100%;font-size:1em">{status_text} ({usage_percent:.1f}%)</span>
+            </div>
+            """)
+        except Exception as e:
+            logger.debug(f"Error formatting traffic_status: {e}")
+            return '-'
     
-    # Add custom columns
+    # Add custom columns to formatters
     try:
-        admin_view.column_formatters = getattr(admin_view, 'column_formatters', {})
-        if not isinstance(admin_view.column_formatters, dict):
+        if not hasattr(admin_view, 'column_formatters'):
             admin_view.column_formatters = {}
-        admin_view.column_formatters['traffic_limit_GB'] = _format_traffic_limit
-        admin_view.column_formatters['total_traffic'] = _format_total_traffic
-        admin_view.column_formatters['remaining_traffic'] = _format_remaining_traffic
-        admin_view.column_formatters['traffic_status'] = _format_traffic_status
+        elif not isinstance(admin_view.column_formatters, dict):
+            admin_view.column_formatters = {}
+        
+        # Preserve existing formatters
+        existing_formatters = admin_view.column_formatters.copy()
+        
+        # Add our formatters
+        existing_formatters.update({
+            'traffic_limit_GB': _format_traffic_limit,
+            'total_traffic': _format_total_traffic,
+            'remaining_traffic': _format_remaining_traffic,
+            'traffic_status': _format_traffic_status
+        })
+        
+        admin_view.column_formatters = existing_formatters
+        logger.debug("Added traffic column formatters")
     except Exception as e:
-        from loguru import logger
         logger.warning(f"Could not add column formatters: {e}")
     
+    # Add form args for traffic_limit_GB
+    try:
+        if not hasattr(admin_view, 'form_args'):
+            admin_view.form_args = {}
+        admin_view.form_args['traffic_limit_GB'] = {
+            'validators': [],
+            'label': _('Traffic Limit (GB)'),
+            'description': _('Maximum total traffic allowed for this agent and all its users (in GB). Leave empty for unlimited.')
+        }
+        logger.debug("Added form_args for traffic_limit_GB")
+    except Exception as e:
+        logger.warning(f"Could not add form_args: {e}")
+    
     # Add custom action
-    @admin_view.action('check_traffic', _('Check Traffic & Disable if Exceeded'))
-    def action_check_traffic(self, ids):
-        """Action to check traffic for selected agents"""
-        try:
-            from flask import flash
-            from hiddifypanel.database import db
-            
-            count = 0
-            for agent_id in ids:
-                agent = AdminUser.query.get(agent_id)
-                if agent and agent.mode == AdminMode.agent:
-                    was_exceeded = AgentTrafficChecker.check_and_disable_if_exceeded(agent.id)
-                    if was_exceeded:
-                        count += 1
-            
-            if count > 0:
-                flash(_(f'Traffic checked for {count} agent(s). Users disabled if exceeded.'), 'warning')
-            else:
-                flash(_('All agents are within their traffic limits.'), 'success')
-            
-            db.session.commit()
-        except Exception as e:
-            logger.error(f"Error in check_traffic action: {e}")
-            flash(_('Error checking traffic: {}').format(str(e)), 'error')
+    try:
+        @admin_view.action('check_traffic', _('Check Traffic & Disable if Exceeded'))
+        def action_check_traffic(self, ids):
+            """Action to check traffic for selected agents"""
+            try:
+                from flask import flash
+                from hiddifypanel.database import db
+                
+                count = 0
+                for agent_id in ids:
+                    agent = AdminUser.query.get(agent_id)
+                    if agent and agent.mode == AdminMode.agent:
+                        was_exceeded = AgentTrafficChecker.check_and_disable_if_exceeded(agent.id)
+                        if was_exceeded:
+                            count += 1
+                
+                if count > 0:
+                    flash(_(f'Traffic checked for {count} agent(s). Users disabled if exceeded.'), 'warning')
+                else:
+                    flash(_('All agents are within their traffic limits.'), 'success')
+                
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"Error in check_traffic action: {e}")
+                from flask import flash
+                flash(_('Error checking traffic: {}').format(str(e)), 'error')
+        
+        logger.debug("Added check_traffic action")
+    except Exception as e:
+        logger.warning(f"Could not add check_traffic action: {e}")
     
     return admin_view
 
@@ -172,11 +283,12 @@ def add_traffic_management_view(admin, app):
                 flash(_('Error checking agents: {}').format(str(e)), 'error')
                 return redirect(url_for('agenttrafficmanagementview.index'))
     
-    admin.add_view(AgentTrafficManagementView(
-        name=_('Agent Traffic Management'),
-        endpoint='agenttrafficmanagementview',
-        category=_('Traffic Management')
-    ))
-    
-    logger.success("Agent traffic management view added to admin")
-
+    try:
+        admin.add_view(AgentTrafficManagementView(
+            name=_('Agent Traffic Management'),
+            endpoint='agenttrafficmanagementview',
+            category=_('Traffic Management')
+        ))
+        logger.success("Agent traffic management view added to admin")
+    except Exception as e:
+        logger.warning(f"Could not add traffic management view: {e}")
