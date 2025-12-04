@@ -227,7 +227,15 @@ pytest
 
 ## نصب سریع (یک خطی)
 
-### روش 1: استفاده از اسکریپت نصب (توصیه می‌شود)
+### روش 1: نصب خودکار کامل (توصیه می‌شود) ⭐
+
+این اسکریپت همه چیز را خودکار انجام می‌دهد: نصب، Integration، و restart سرویس‌ها
+
+```bash
+cd /opt/hiddify-manager && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && bash auto_install.sh
+```
+
+### روش 2: استفاده از اسکریپت نصب ساده
 
 ```bash
 cd /opt/hiddify-manager && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && bash install.sh
