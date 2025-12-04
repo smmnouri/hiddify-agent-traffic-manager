@@ -37,28 +37,29 @@ def init_app(app):
         from hiddifypanel import Events
         from loguru import logger
         
+        # Extend AdminstratorAdmin class before it's used
+        try:
+            from hiddifypanel.panel.admin.AdminstratorAdmin import AdminstratorAdmin
+            import hiddifypanel.panel.admin.AdminstratorAdmin as admin_module
+            
+            # Extend the class
+            extended_class = extend_admin_user_view(AdminstratorAdmin)
+            admin_module.AdminstratorAdmin = extended_class
+            
+            logger.success("Extended AdminstratorAdmin class with traffic management")
+        except Exception as e:
+            logger.warning(f"Could not extend AdminstratorAdmin class: {e}")
+        
         def extend_admin_views(flaskadmin=None, admin_bp=None):
             """Extend admin views using HiddifyPanel's event system"""
             try:
-                # Import AdminstratorAdmin
-                from hiddifypanel.panel.admin.AdminstratorAdmin import AdminstratorAdmin
-                
-                # Extend the AdminstratorAdmin class
-                extended_class = extend_admin_user_view(AdminstratorAdmin)
-                
-                # Replace the original class with extended one
-                import hiddifypanel.panel.admin.AdminstratorAdmin as admin_module
-                admin_module.AdminstratorAdmin = extended_class
-                
-                logger.success("Extended AdminstratorAdmin with traffic management")
-                
                 # Add traffic management view if admin instance is available
                 if flaskadmin:
                     add_traffic_management_view(flaskadmin, app)
                     logger.success("Added traffic management view to admin")
                     
             except Exception as e:
-                logger.error(f"Error extending admin views: {e}")
+                logger.error(f"Error adding traffic management view: {e}")
                 import traceback
                 logger.debug(traceback.format_exc())
         
@@ -66,7 +67,7 @@ def init_app(app):
         Events.admin_prehook.subscribe(extend_admin_views)
         logger.success("Registered admin_prehook for traffic management")
         
-        # Also try to extend immediately if admin is already initialized
+        # Also try to add view immediately if admin is already initialized
         try:
             from hiddifypanel.panel.admin import flaskadmin
             if flaskadmin:
