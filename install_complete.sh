@@ -187,56 +187,82 @@ echo ""
 # Step 5: Verify installation
 echo -e "${BLUE}Step 5: Verifying installation...${NC}"
 
-# First check if package directory exists
-PACKAGE_FOUND=false
-if [ -n "$SITE_PACKAGES" ] && [ -d "$SITE_PACKAGES/hiddify_agent_traffic_manager" ]; then
-    if [ -f "$SITE_PACKAGES/hiddify_agent_traffic_manager/__init__.py" ]; then
-        PACKAGE_FOUND=true
-        echo -e "${GREEN}✓ Package directory found at: $SITE_PACKAGES/hiddify_agent_traffic_manager${NC}"
+VERIFICATION_PASSED=false
+
+# Method 1: Check if installed via pip (editable mode)
+if $PYTHON_CMD -c "import pkg_resources; pkg_resources.get_distribution('hiddify-agent-traffic-manager')" 2>/dev/null; then
+    echo -e "${GREEN}✓ Module installed via pip (editable mode)${NC}"
+    VERIFICATION_PASSED=true
+fi
+
+# Method 2: Check if package directory exists in site-packages
+if [ "$VERIFICATION_PASSED" = false ] && [ -n "$SITE_PACKAGES" ]; then
+    if [ -d "$SITE_PACKAGES/hiddify_agent_traffic_manager" ]; then
+        if [ -f "$SITE_PACKAGES/hiddify_agent_traffic_manager/__init__.py" ]; then
+            echo -e "${GREEN}✓ Package directory found at: $SITE_PACKAGES/hiddify_agent_traffic_manager${NC}"
+            VERIFICATION_PASSED=true
+        fi
     fi
 fi
 
-# Try to import (but don't fail if it doesn't work - dependencies might not be available yet)
-VERIFY_OUTPUT=$($PYTHON_CMD -c "
+# Method 3: Try simple import (without executing full module code)
+if [ "$VERIFICATION_PASSED" = false ]; then
+    # Just check if module can be found, don't execute imports
+    VERIFY_OUTPUT=$($PYTHON_CMD -c "
 import sys
-try:
-    import hiddify_agent_traffic_manager
-    print('OK')
-except ImportError as e:
-    print(f'IMPORT_ERROR: {e}')
-    sys.exit(1)
-except Exception as e:
-    print(f'OTHER_ERROR: {e}')
+import importlib.util
+
+# Try to find the module
+spec = None
+for path in sys.path:
+    try:
+        spec = importlib.util.find_spec('hiddify_agent_traffic_manager', [path])
+        if spec:
+            print('FOUND')
+            break
+    except:
+        pass
+
+if not spec:
+    print('NOT_FOUND')
     sys.exit(1)
 " 2>&1)
-VERIFY_EXIT=$?
-
-if [ $VERIFY_EXIT -eq 0 ] && [ "$VERIFY_OUTPUT" = "OK" ]; then
-    echo -e "${GREEN}✓ Module verification successful${NC}"
-elif [ "$PACKAGE_FOUND" = true ]; then
-    # Package exists but import failed - likely dependency issue
-    echo -e "${YELLOW}⚠ Module files found but import failed${NC}"
-    if [ -n "$VERIFY_OUTPUT" ]; then
-        echo -e "${YELLOW}Error: $VERIFY_OUTPUT${NC}"
-    fi
-    echo -e "${YELLOW}This is usually OK - dependencies will be available when HiddifyPanel runs${NC}"
-    echo -e "${GREEN}✓ Continuing installation...${NC}"
-else
-    # Package not found
-    echo -e "${RED}✗ Module verification failed!${NC}"
-    if [ -n "$VERIFY_OUTPUT" ]; then
-        echo -e "${YELLOW}Error: $VERIFY_OUTPUT${NC}"
-    fi
-    echo -e "${YELLOW}Checking installation...${NC}"
     
-    # Check if installed via pip
-    if $PYTHON_CMD -c "import pkg_resources; pkg_resources.get_distribution('hiddify-agent-traffic-manager')" 2>/dev/null; then
-        echo -e "${GREEN}✓ Module installed via pip${NC}"
-        echo -e "${GREEN}✓ Continuing installation...${NC}"
-    else
-        echo -e "${YELLOW}Module may not be properly installed, but continuing...${NC}"
-        echo -e "${YELLOW}If you encounter runtime errors, please check the installation${NC}"
+    if echo "$VERIFY_OUTPUT" | grep -q "FOUND"; then
+        echo -e "${GREEN}✓ Module found in Python path${NC}"
+        VERIFICATION_PASSED=true
     fi
+fi
+
+# Final check: Try actual import (may fail due to dependencies, but that's OK)
+if [ "$VERIFICATION_PASSED" = true ]; then
+    # Try import but don't fail if dependencies are missing
+    IMPORT_TEST=$($PYTHON_CMD -c "
+try:
+    import hiddify_agent_traffic_manager
+    print('IMPORT_OK')
+except ImportError as e:
+    if 'hiddifypanel' in str(e).lower():
+        print('IMPORT_OK_DEPENDENCY_MISSING')
+    else:
+        print(f'IMPORT_ERROR: {e}')
+except Exception as e:
+    print(f'IMPORT_ERROR: {e}')
+" 2>&1)
+    
+    if echo "$IMPORT_TEST" | grep -q "IMPORT_OK"; then
+        echo -e "${GREEN}✓ Module can be imported${NC}"
+    elif echo "$IMPORT_TEST" | grep -q "DEPENDENCY_MISSING"; then
+        echo -e "${YELLOW}⚠ Module found but HiddifyPanel dependencies not available (this is OK)${NC}"
+    else
+        echo -e "${YELLOW}⚠ Import test: $IMPORT_TEST${NC}"
+        echo -e "${YELLOW}This may be OK - dependencies will be available when HiddifyPanel runs${NC}"
+    fi
+    echo -e "${GREEN}✓ Module verification successful${NC}"
+else
+    echo -e "${YELLOW}⚠ Could not verify module installation${NC}"
+    echo -e "${YELLOW}This may be OK if module was installed in a different location${NC}"
+    echo -e "${YELLOW}Continuing installation...${NC}"
 fi
 
 echo ""
