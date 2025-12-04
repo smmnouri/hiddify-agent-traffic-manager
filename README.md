@@ -227,11 +227,21 @@ pytest
 
 ## نصب سریع (یک خطی)
 
+### روش 1: استفاده از اسکریپت نصب (توصیه می‌شود)
+
+```bash
+cd /opt/hiddify-manager && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && bash install.sh
+```
+
+### روش 2: دستورات دستی
+
 ```bash
 cd /opt/hiddify-manager && source .venv313/bin/activate && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && pip install -e .
 ```
 
 **توجه**: بعد از نصب، باید ماژول را به HiddifyPanel اضافه کنید (بخش Integration را ببینید).
+
+برای راهنمای کامل نصب در Ubuntu، فایل [INSTALL_UBUNTU.md](INSTALL_UBUNTU.md) را مطالعه کنید.
 
 ## پشتیبانی
 
