@@ -50,9 +50,16 @@ if [ ! -f ".venv313/bin/pip" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}Using pip from virtual environment...${NC}"
-# We'll use the full path to pip from venv to avoid externally-managed-environment error
+# Set pip command to use venv pip directly
 PIP_CMD="/opt/hiddify-manager/.venv313/bin/pip"
+PYTHON_CMD="/opt/hiddify-manager/.venv313/bin/python"
+
+echo -e "${GREEN}Using pip from virtual environment: $PIP_CMD${NC}"
+echo -e "${GREEN}Using python from virtual environment: $PYTHON_CMD${NC}"
+
+# Verify we're using the right pip
+PIP_LOCATION=$($PIP_CMD --version 2>&1 | head -n1)
+echo -e "${YELLOW}Pip location: $PIP_LOCATION${NC}"
 
 echo -e "${GREEN}Step 2: Cloning repository...${NC}"
 if [ -d "hiddify-agent-traffic-manager" ]; then
@@ -66,8 +73,18 @@ fi
 
 echo -e "${GREEN}Step 3: Installing module...${NC}"
 # Use pip from venv explicitly to avoid externally-managed-environment error
-echo -e "${YELLOW}Using: $PIP_CMD install -e .${NC}"
-$PIP_CMD install -e .
+echo -e "${YELLOW}Installing with: $PIP_CMD install -e .${NC}"
+
+# Try installation
+if $PIP_CMD install -e .; then
+    echo -e "${GREEN}Installation successful!${NC}"
+else
+    echo -e "${RED}Installation failed!${NC}"
+    echo -e "${YELLOW}Trying alternative method...${NC}"
+    
+    # Alternative: use python -m pip
+    $PYTHON_CMD -m pip install -e .
+fi
 
 echo -e "${GREEN}Step 4: Installation completed!${NC}"
 echo ""
