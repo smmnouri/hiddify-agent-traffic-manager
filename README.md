@@ -13,18 +13,58 @@
 
 ## نصب
 
-### روش 1: نصب به عنوان ماژول
+### نصب در Ubuntu (HiddifyPanel)
+
+برای نصب این ماژول در سرور Ubuntu که HiddifyPanel روی آن نصب است، دستورات زیر را اجرا کنید:
 
 ```bash
-# کلون کردن ماژول
-git clone <repository-url> hiddify-agent-traffic-manager
+# 1. رفتن به مسیر HiddifyPanel
+cd /opt/hiddify-manager
 
-# نصب
+# 2. فعال‌سازی virtual environment (اگر از venv استفاده می‌کنید)
+source .venv313/bin/activate  # یا مسیر venv شما
+
+# 3. کلون کردن ماژول
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+
+# 4. نصب ماژول
 cd hiddify-agent-traffic-manager
 pip install -e .
+
+# 5. Integration با HiddifyPanel
+# فایل wsgi_app.py یا app.py اصلی HiddifyPanel را ویرایش کنید
+# مسیر معمول: /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/apps/wsgi_app.py
+# یا اگر از source استفاده می‌کنید: /opt/hiddify-manager/hiddify-panel/src/hiddifypanel/apps/wsgi_app.py
 ```
 
-### روش 2: نصب دستی
+### Integration با HiddifyPanel
+
+بعد از نصب، باید ماژول را به HiddifyPanel اضافه کنید. فایل `wsgi_app.py` را ویرایش کنید:
+
+```python
+# در تابع create_app() یا wsgi_app.py
+from hiddify_agent_traffic_manager import init_app
+
+def create_app():
+    app = create_app_base()  # یا هر تابعی که app اصلی را می‌سازد
+    
+    # Initialize agent traffic manager
+    app = init_app(app)
+    
+    return app
+```
+
+**مسیر فایل‌های HiddifyPanel:**
+- اگر از package نصب شده: `/opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/apps/wsgi_app.py`
+- اگر از source: `/opt/hiddify-manager/hiddify-panel/src/hiddifypanel/apps/wsgi_app.py`
+
+### نصب از PyPI (اگر منتشر شود)
+
+```bash
+pip install hiddify-agent-traffic-manager
+```
+
+### نصب دستی
 
 1. فایل‌های ماژول را در مسیر مناسب کپی کنید
 2. در فایل `app.py` یا فایل اصلی HiddifyPanel، ماژول را import کنید:
@@ -36,6 +76,10 @@ from hiddify_agent_traffic_manager import init_app
 app = create_app()
 app = init_app(app)
 ```
+
+### راهنمای کامل Integration
+
+برای راهنمای کامل Integration با HiddifyPanel، فایل [INTEGRATION.md](INTEGRATION.md) را مطالعه کنید.
 
 ## استفاده
 
@@ -181,7 +225,17 @@ pytest
 
 این ماژول تحت مجوز GPL-3.0 منتشر شده است.
 
+## نصب سریع (یک خطی)
+
+```bash
+cd /opt/hiddify-manager && source .venv313/bin/activate && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && pip install -e .
+```
+
+**توجه**: بعد از نصب، باید ماژول را به HiddifyPanel اضافه کنید (بخش Integration را ببینید).
+
 ## پشتیبانی
 
-برای گزارش مشکل یا درخواست قابلیت جدید، لطفاً Issue ایجاد کنید.
+برای گزارش مشکل یا درخواست قابلیت جدید، لطفاً Issue ایجاد کنید:
+
+**Repository**: https://github.com/smmnouri/hiddify-agent-traffic-manager
 
