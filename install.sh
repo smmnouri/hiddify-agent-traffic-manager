@@ -1,6 +1,7 @@
 #!/bin/bash
 # One-line installer for HiddifyPanel with Agent Traffic Management
 # Usage: bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
+# Or: bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh) YOUR_USERNAME YOUR_REPO_NAME
 
 set -e
 
@@ -10,8 +11,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-GITHUB_USER="smmnouri"
-CUSTOM_REPO="hiddify-panel-custom"  # یا repository شما
+# Configuration - می‌تواند از command line هم دریافت شود
+GITHUB_USER="${1:-smmnouri}"
+CUSTOM_REPO="${2:-hiddify-panel-custom}"
 HIDDIFY_DIR="/opt/hiddify-manager"
 
 echo -e "${BLUE}==========================================${NC}"
@@ -60,8 +62,10 @@ else
         cd hiddify-panel-custom
         
         # Download and apply patches
+        echo -e "${BLUE}Applying agent traffic management patches...${NC}"
         curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh | bash || {
-            echo -e "${YELLOW}Manual patching required${NC}"
+            echo -e "${YELLOW}Could not apply patches automatically${NC}"
+            echo -e "${YELLOW}Please run setup_custom_repo.sh manually${NC}"
         }
         
         # Set remote

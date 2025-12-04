@@ -1,59 +1,41 @@
-# نصب سریع - حل مشکل externally-managed-environment
+# نصب سریع - یک خطی
 
-## مشکل
+## نصب HiddifyPanel با قابلیت‌های مدیریت ترافیک ایجنت
 
-در Ubuntu 22.04+، حتی با فعال کردن venv، ممکن است خطای `externally-managed-environment` دریافت کنید.
+### مرحله 1: ایجاد Repository سفارشی (یک بار)
 
-## راه‌حل: استفاده مستقیم از pip از venv
-
-### روش 1: استفاده از مسیر کامل pip
+ابتدا باید repository سفارشی خودتان را بسازید:
 
 ```bash
 cd /opt/hiddify-manager
 git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
 cd hiddify-agent-traffic-manager
-
-# استفاده مستقیم از pip از venv (بدون فعال کردن venv)
-/opt/hiddify-manager/.venv313/bin/pip install -e .
+bash setup_custom_repo.sh
 ```
 
-### روش 2: استفاده از اسکریپت نصب
+این کار یک repository در GitHub شما می‌سازد با نام `hiddify-panel-custom` (یا نامی که انتخاب کنید).
+
+### مرحله 2: نصب یک خطی
+
+بعد از اینکه repository شما آماده شد، برای نصب در سرورهای دیگر:
 
 ```bash
-cd /opt/hiddify-manager
-git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
-cd hiddify-agent-traffic-manager
-bash install.sh
+bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
 ```
 
-### روش 3: اگر venv فعال است اما هنوز خطا می‌دهد
+یا اگر می‌خواهید URL کوتاه‌تری داشته باشید، می‌توانید از یک URL shortener استفاده کنید.
+
+## تنظیمات
+
+اگر می‌خواهید repository دیگری استفاده کنید، فایل `install.sh` را ویرایش کنید:
 
 ```bash
-# بررسی اینکه کدام pip استفاده می‌شود
-which pip
-
-# اگر system pip است، از مسیر کامل استفاده کنید:
-/opt/hiddify-manager/.venv313/bin/pip install -e .
-
-# یا venv را دوباره فعال کنید:
-deactivate
-source /opt/hiddify-manager/.venv313/bin/activate
-which pip  # باید /opt/hiddify-manager/.venv313/bin/pip باشد
-pip install -e .
+GITHUB_USER="YOUR_USERNAME"
+CUSTOM_REPO="YOUR_REPO_NAME"
 ```
 
-## بررسی نصب
+یا می‌توانید مستقیماً repository را مشخص کنید:
 
 ```bash
-# بررسی اینکه ماژول نصب شده است
-/opt/hiddify-manager/.venv313/bin/python -c "import hiddify_agent_traffic_manager; print('OK')"
+bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh) YOUR_USERNAME YOUR_REPO_NAME
 ```
-
-## نکته مهم
-
-**هرگز از `--break-system-packages` استفاده نکنید!** این می‌تواند سیستم شما را خراب کند.
-
-همیشه از pip از virtual environment استفاده کنید:
-- `/opt/hiddify-manager/.venv313/bin/pip` ✅
-- نه `pip` یا `/usr/bin/pip` ❌
-
