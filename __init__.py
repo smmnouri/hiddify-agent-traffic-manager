@@ -13,7 +13,11 @@ from .tasks.periodic_checker import setup_periodic_checker
 from .utils.user_creation_hook import init_user_creation_hook
 
 def init_app(app):
-    """Initialize the agent traffic manager extension"""
+    """Initialize the agent traffic manager extension
+    
+    This function is called by HiddifyPanel's extension system.
+    It can also be called manually: app = init_app(app)
+    """
     # Initialize database extensions
     init_agent_traffic(app)
     

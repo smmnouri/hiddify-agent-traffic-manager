@@ -201,39 +201,66 @@ if 'from hiddify_agent_traffic_manager import init_app' not in content:
         if import_added:
             content = '\n'.join(lines)
 
-# Add init_app call in create_app function before return
-if 'app = init_app(app)' not in content and 'def create_app' in content:
-    # Find the return statement in create_app
-    pattern = r'(def create_app\([^)]*\):.*?)(\n\s+app\.config\.load_extensions\("EXTENSIONS"\)\s*\n\s+return\s+app)'
-    
-    def replace_func(match):
-        before = match.group(1)
-        after = match.group(2)
-        # Add init_app before return
-        return before + '\n    # Initialize agent traffic manager\n    app = init_app(app)' + after
-    
-    new_content = re.sub(pattern, replace_func, content, flags=re.DOTALL)
-    
-    if new_content == content:
-        # Fallback: add before return app
-        lines = content.split('\n')
-        for i in range(len(lines) - 1, -1, -1):
-            if 'return app' in lines[i] and i > 0:
-                # Check if we're in create_app function
-                func_start = -1
-                for j in range(i, -1, -1):
-                    if 'def create_app' in lines[j]:
-                        func_start = j
-                        break
+# Add to extensions list (HiddifyPanel uses extension system)
+if 'hiddify_agent_traffic_manager' not in content:
+    # Find extensions list and add our extension
+    # Look for extensions.extend or extensions.append
+    if 'extensions.extend([' in content:
+        # Add to the extend list
+        content = content.replace(
+            'extensions.extend([',
+            'extensions.extend([\n            "hiddify_agent_traffic_manager:init_app",'
+        )
+        print("Added to extensions.extend")
+    elif 'extensions = [' in content:
+        # Add to the list
+        pattern = r'(extensions\s*=\s*\[[^\]]*)(\])'
+        def add_extension(match):
+            before = match.group(1)
+            # Check if list is empty or has items
+            if before.strip().endswith('['):
+                return before + '\n        "hiddify_agent_traffic_manager:init_app",' + match.group(2)
+            else:
+                return before + ',\n        "hiddify_agent_traffic_manager:init_app"' + match.group(2)
+        content = re.sub(pattern, add_extension, content)
+        print("Added to extensions list")
+    else:
+        # Fallback: add init_app call before return
+        if 'app = init_app(app)' not in content and 'def create_app' in content:
+            # Find the return statement in create_app
+            pattern = r'(def create_app\([^)]*\):.*?)(\n\s+app\.config\.load_extensions\("EXTENSIONS"\)\s*\n\s+return\s+app)'
+            
+            def replace_func(match):
+                before = match.group(1)
+                after = match.group(2)
+                # Add init_app before return
+                return before + '\n    # Initialize agent traffic manager\n    app = init_app(app)' + after
+            
+            new_content = re.sub(pattern, replace_func, content, flags=re.DOTALL)
+            
+            if new_content == content:
+                # Fallback: add before return app
+                lines = content.split('\n')
+                for i in range(len(lines) - 1, -1, -1):
+                    if 'return app' in lines[i] and i > 0:
+                        # Check if we're in create_app function
+                        func_start = -1
+                        for j in range(i, -1, -1):
+                            if 'def create_app' in lines[j]:
+                                func_start = j
+                                break
+                        
+                        if func_start >= 0:
+                            indent = len(lines[i]) - len(lines[i].lstrip())
+                            lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
+                            lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
+                            new_content = '\n'.join(lines)
+                            break
                 
-                if func_start >= 0:
-                    indent = len(lines[i]) - len(lines[i].lstrip())
-                    lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
-                    lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
-                    new_content = '\n'.join(lines)
-                    break
-    
-    content = new_content
+                content = new_content
+            else:
+                content = new_content
+                print("Added init_app call before return")
 
 # Write back
 with open(file_path, 'w', encoding='utf-8') as f:
