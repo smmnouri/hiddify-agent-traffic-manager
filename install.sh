@@ -29,8 +29,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Step 2: Check if Hiddify-Manager exists
-# First, verify the directory actually exists
-if [ ! -d "$HIDDIFY_DIR" ]; then
+# First, verify the directory actually exists and is not empty
+if [ ! -d "$HIDDIFY_DIR" ] || [ -z "$(ls -A "$HIDDIFY_DIR" 2>/dev/null)" ]; then
     echo -e "${YELLOW}Hiddify-Manager not found. Installing Hiddify-Manager first...${NC}"
     echo -e "${YELLOW}This may take several minutes. Please wait...${NC}"
     
