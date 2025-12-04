@@ -1,110 +1,182 @@
 #!/bin/bash
-# Installation script for Hiddify Agent Traffic Manager
-# Usage: bash install.sh
+# One-line installer for HiddifyPanel with Agent Traffic Management
+# Usage: bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
 
 set -e
 
-echo "=========================================="
-echo "Hiddify Agent Traffic Manager Installer"
-echo "=========================================="
-echo ""
-
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Check if running as root - Allow but warn
-if [ "$EUID" -eq 0 ]; then 
-   echo -e "${YELLOW}Warning: Running as root. It's recommended to run as hiddify-panel user.${NC}"
-   echo -e "${YELLOW}Continuing anyway...${NC}"
-   echo ""
-fi
+GITHUB_USER="smmnouri"
+CUSTOM_REPO="hiddify-panel-custom"  # یا repository شما
+HIDDIFY_DIR="/opt/hiddify-manager"
 
-# Check if HiddifyPanel is installed
-if [ ! -d "/opt/hiddify-manager" ]; then
-    echo -e "${RED}Error: HiddifyPanel not found at /opt/hiddify-manager${NC}"
-    echo "Please install HiddifyPanel first."
+echo -e "${BLUE}==========================================${NC}"
+echo -e "${BLUE}HiddifyPanel with Agent Traffic Management${NC}"
+echo -e "${BLUE}Installer${NC}"
+echo -e "${BLUE}==========================================${NC}"
+echo ""
+
+# Step 1: Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}✗ Please run as root${NC}"
     exit 1
 fi
 
-# Check if virtual environment exists
-if [ ! -d "/opt/hiddify-manager/.venv313" ]; then
-    echo -e "${RED}Error: Virtual environment not found at /opt/hiddify-manager/.venv313${NC}"
-    exit 1
+# Step 2: Check if Hiddify-Manager exists
+if [ ! -d "$HIDDIFY_DIR" ]; then
+    echo -e "${YELLOW}Hiddify-Manager not found. Installing Hiddify-Manager first...${NC}"
+    bash <(curl -s https://get.hiddify.com/install.sh) || {
+        echo -e "${RED}✗ Failed to install Hiddify-Manager${NC}"
+        exit 1
+    }
 fi
 
-echo -e "${GREEN}Step 1: Going to HiddifyPanel directory...${NC}"
-cd /opt/hiddify-manager
+echo -e "${GREEN}✓ Hiddify-Manager found${NC}"
+echo ""
 
-# Check if venv exists
-if [ ! -d ".venv313" ]; then
-    echo -e "${RED}Error: Virtual environment not found at /opt/hiddify-manager/.venv313${NC}"
-    exit 1
-fi
+# Step 3: Setup custom repository
+echo -e "${BLUE}Step 1: Setting up custom HiddifyPanel repository...${NC}"
 
-# Check if pip exists in venv
-if [ ! -f ".venv313/bin/pip" ]; then
-    echo -e "${RED}Error: pip not found in virtual environment${NC}"
-    exit 1
-fi
+CUSTOM_REPO_DIR="$HIDDIFY_DIR/hiddify-panel-custom"
+REPO_URL="https://github.com/$GITHUB_USER/$CUSTOM_REPO.git"
 
-# Set pip command to use venv pip directly
-PIP_CMD="/opt/hiddify-manager/.venv313/bin/pip"
-PYTHON_CMD="/opt/hiddify-manager/.venv313/bin/python"
-
-echo -e "${GREEN}Using pip from virtual environment: $PIP_CMD${NC}"
-echo -e "${GREEN}Using python from virtual environment: $PYTHON_CMD${NC}"
-
-# Verify we're using the right pip
-PIP_LOCATION=$($PIP_CMD --version 2>&1 | head -n1)
-echo -e "${YELLOW}Pip location: $PIP_LOCATION${NC}"
-
-echo -e "${GREEN}Step 2: Cloning repository...${NC}"
-if [ -d "hiddify-agent-traffic-manager" ]; then
-    echo -e "${YELLOW}Directory exists. Updating...${NC}"
-    cd hiddify-agent-traffic-manager
-    git pull
+if [ -d "$CUSTOM_REPO_DIR" ]; then
+    echo -e "${YELLOW}Custom repo exists, updating...${NC}"
+    cd "$CUSTOM_REPO_DIR"
+    git pull origin main || git pull origin master || echo "Could not pull"
 else
-    git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
-    cd hiddify-agent-traffic-manager
+    echo -e "${GREEN}Cloning custom repository...${NC}"
+    cd "$HIDDIFY_DIR"
+    git clone "$REPO_URL" hiddify-panel-custom || {
+        echo -e "${RED}✗ Failed to clone repository${NC}"
+        echo -e "${YELLOW}Creating repository with patches...${NC}"
+        
+        # Clone original and apply patches
+        git clone https://github.com/hiddify/HiddifyPanel.git hiddify-panel-custom
+        cd hiddify-panel-custom
+        
+        # Download and apply patches
+        curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh | bash || {
+            echo -e "${YELLOW}Manual patching required${NC}"
+        }
+        
+        # Set remote
+        git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+    fi
 fi
 
-echo -e "${GREEN}Step 3: Installing module...${NC}"
-# Use pip from venv explicitly to avoid externally-managed-environment error
-echo -e "${YELLOW}Installing with: $PIP_CMD install -e .${NC}"
+echo -e "${GREEN}✓ Repository ready${NC}"
+echo ""
 
-# Try installation
-if $PIP_CMD install -e .; then
-    echo -e "${GREEN}Installation successful!${NC}"
+# Step 4: Install from custom repo
+echo -e "${BLUE}Step 2: Installing from custom repository...${NC}"
+
+cd "$CUSTOM_REPO_DIR"
+
+# Check if it's a proper HiddifyPanel structure
+if [ ! -d "src" ] && [ -d "hiddifypanel" ]; then
+    # It's the source structure
+    SOURCE_DIR="$CUSTOM_REPO_DIR"
+elif [ -d "src" ]; then
+    SOURCE_DIR="$CUSTOM_REPO_DIR/src"
 else
-    echo -e "${RED}Installation failed!${NC}"
-    echo -e "${YELLOW}Trying alternative method...${NC}"
+    echo -e "${RED}✗ Invalid repository structure${NC}"
+    exit 1
+fi
+
+# Install using pip
+VENV_DIR="$HIDDIFY_DIR/.venv313"
+if [ -d "$VENV_DIR" ]; then
+    PIP_CMD="$VENV_DIR/bin/pip"
+    if [ ! -f "$PIP_CMD" ]; then
+        PIP_CMD="$VENV_DIR/bin/python -m pip"
+    fi
     
-    # Alternative: use python -m pip
-    $PYTHON_CMD -m pip install -e .
+    echo -e "${BLUE}Installing from source...${NC}"
+    cd "$SOURCE_DIR"
+    $PIP_CMD install -e . || {
+        echo -e "${YELLOW}pip install failed, trying alternative...${NC}"
+        cd "$CUSTOM_REPO_DIR"
+        if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+            $PIP_CMD install -e .
+        else
+            echo -e "${YELLOW}Manual installation required${NC}"
+        fi
+    }
+    
+    echo -e "${GREEN}✓ Installed from custom repository${NC}"
+else
+    echo -e "${YELLOW}⚠ Virtual environment not found${NC}"
 fi
 
-echo -e "${GREEN}Step 4: Installation completed!${NC}"
 echo ""
-echo -e "${YELLOW}⚠️  IMPORTANT: Manual Integration Required${NC}"
-echo ""
-echo "You need to manually integrate the module with HiddifyPanel:"
-echo ""
-echo "1. Edit the wsgi_app.py file:"
-echo "   - Package install: /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/apps/wsgi_app.py"
-echo "   - Source install: /opt/hiddify-manager/hiddify-panel/src/hiddifypanel/apps/wsgi_app.py"
-echo ""
-echo "2. Add these lines:"
-echo "   At the top: from hiddify_agent_traffic_manager import init_app"
-echo "   In create_app(): app = init_app(app)"
-echo ""
-echo "3. Restart services:"
-echo "   sudo systemctl restart hiddify-panel"
-echo "   sudo systemctl restart hiddify-panel-background-tasks"
-echo ""
-echo "For detailed instructions, see: INSTALL_UBUNTU.md"
-echo ""
-echo -e "${GREEN}Installation script completed!${NC}"
 
+# Step 5: Database migration
+echo -e "${BLUE}Step 3: Running database migration...${NC}"
+
+PYTHON_CMD="$VENV_DIR/bin/python"
+if [ ! -f "$PYTHON_CMD" ]; then
+    PYTHON_CMD=$(find "$VENV_DIR" -name "python*" -type f -executable 2>/dev/null | head -n1)
+fi
+
+if [ -f "$PYTHON_CMD" ]; then
+    $PYTHON_CMD << 'PYTHON_SCRIPT'
+import sys
+sys.path.insert(0, '/opt/hiddify-manager/hiddify-panel-custom/src')
+
+from hiddifypanel.database import db
+from sqlalchemy import inspect
+
+try:
+    inspector = inspect(db.engine)
+    columns = [col['name'] for col in inspector.get_columns('admin_user')]
+    
+    if 'traffic_limit' not in columns:
+        print("Adding traffic_limit column...")
+        db.session.execute(db.text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+        db.session.commit()
+        print("✓ Column added successfully")
+    else:
+        print("✓ Column already exists")
+except Exception as e:
+    print(f"Error: {e}")
+    import traceback
+    traceback.print_exc()
+PYTHON_SCRIPT
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Database migration completed${NC}"
+    else
+        echo -e "${YELLOW}⚠ Database migration had issues${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠ Python not found, skipping migration${NC}"
+fi
+
+echo ""
+
+# Step 6: Restart services
+echo -e "${BLUE}Step 4: Restarting services...${NC}"
+
+if systemctl is-active --quiet hiddify-panel; then
+    systemctl restart hiddify-panel
+    echo -e "${GREEN}✓ hiddify-panel restarted${NC}"
+fi
+
+if systemctl is-active --quiet hiddify-panel-background-tasks; then
+    systemctl restart hiddify-panel-background-tasks
+    echo -e "${GREEN}✓ hiddify-panel-background-tasks restarted${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}==========================================${NC}"
+echo -e "${GREEN}Installation completed!${NC}"
+echo -e "${GREEN}==========================================${NC}"
+echo ""
+echo -e "${YELLOW}Repository: https://github.com/$GITHUB_USER/$CUSTOM_REPO${NC}"
+echo -e "${YELLOW}Custom source: $CUSTOM_REPO_DIR${NC}"
+echo ""

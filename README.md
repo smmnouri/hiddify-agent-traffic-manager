@@ -13,7 +13,24 @@
 
 ## نصب
 
-### روش 1: ایجاد Repository سفارشی خودتان (توصیه می‌شود) ⭐
+### نصب یک خطی (ساده‌ترین روش) ⭐⭐⭐
+
+برای نصب HiddifyPanel با قابلیت‌های مدیریت ترافیک ایجنت از repository شما:
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
+```
+
+این دستور:
+- ✅ Hiddify-Manager را نصب می‌کند (اگر نصب نباشد)
+- ✅ Repository سفارشی شما را کلون می‌کند
+- ✅ HiddifyPanel را از repository شما نصب می‌کند
+- ✅ Database migration انجام می‌دهد
+- ✅ سرویس‌ها را restart می‌کند
+
+**نکته**: قبل از اجرا، مطمئن شوید که repository `hiddify-panel-custom` در GitHub شما وجود دارد.
+
+### روش 2: ایجاد Repository سفارشی خودتان ⭐⭐
 
 این روش یک repository سفارشی از HiddifyPanel با تغییرات اعمال شده برای شما می‌سازد:
 
