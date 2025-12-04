@@ -6,11 +6,32 @@ Hiddify Agent Traffic Manager
 __version__ = "1.0.0"
 __author__ = "Hiddify Agent Traffic Manager"
 
-from .models.agent_traffic import init_agent_traffic
-from .utils.traffic_calculator import AgentTrafficCalculator
-from .utils.traffic_checker import AgentTrafficChecker
-from .tasks.periodic_checker import setup_periodic_checker
-from .utils.user_creation_hook import init_user_creation_hook
+# Import with error handling to prevent crash
+try:
+    from .models.agent_traffic import init_agent_traffic
+    from .utils.traffic_calculator import AgentTrafficCalculator
+    from .utils.traffic_checker import AgentTrafficChecker
+    from .tasks.periodic_checker import setup_periodic_checker
+    from .utils.user_creation_hook import init_user_creation_hook
+except ImportError as e:
+    # If imports fail, create dummy functions
+    from loguru import logger
+    logger.error(f"Failed to import agent traffic manager modules: {e}")
+    
+    def init_agent_traffic(app):
+        pass
+    
+    class AgentTrafficCalculator:
+        pass
+    
+    class AgentTrafficChecker:
+        pass
+    
+    def setup_periodic_checker(app):
+        pass
+    
+    def init_user_creation_hook():
+        pass
 
 def init_app(app):
     """Initialize the agent traffic manager extension
