@@ -108,7 +108,24 @@ tail -f /opt/hiddify-manager/log/system/panel.log
 
 ## نصب خودکار (اسکریپت)
 
-می‌توانید از اسکریپت زیر برای نصب خودکار استفاده کنید:
+می‌توانید از اسکریپت نصب استفاده کنید:
+
+```bash
+cd /opt/hiddify-manager
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+bash install.sh
+```
+
+**توصیه**: بهتر است به عنوان کاربر `hiddify-panel` اجرا کنید:
+
+```bash
+sudo -u hiddify-panel bash install.sh
+```
+
+یا اگر به عنوان root اجرا می‌کنید، اسکریپت warning می‌دهد اما ادامه می‌دهد.
+
+### اسکریپت دستی (اگر install.sh کار نکرد):
 
 ```bash
 #!/bin/bash
