@@ -98,6 +98,62 @@ app = init_app(app)
 
 برای راهنمای کامل Integration با HiddifyPanel، فایل [INTEGRATION.md](INTEGRATION.md) را مطالعه کنید.
 
+### رفع مشکلات (Troubleshooting)
+
+اگر بعد از نصب با مشکل مواجه شدید:
+
+#### 1. بررسی و رفع مشکلات Integration
+
+```bash
+cd /opt/hiddify-manager/hiddify-agent-traffic-manager
+bash fix_integration.sh
+```
+
+این اسکریپت:
+- ✓ base.py را از backup restore می‌کند (اگر syntax error داشته باشد)
+- ✓ بررسی می‌کند که integration درست انجام شده یا نه
+- ✓ خطاهای syntax را نشان می‌دهد
+
+#### 2. Restore دستی base.py
+
+اگر `base.py` syntax error دارد:
+
+```bash
+# پیدا کردن آخرین backup
+ls -lt /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/base.py.backup.* | head -1
+
+# Restore (مثال)
+cp /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/base.py.backup.20251204_221727 \
+   /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/base.py
+
+# سپس دوباره نصب کنید
+cd /opt/hiddify-manager/hiddify-agent-traffic-manager
+bash install_complete.sh
+```
+
+#### 3. بررسی لاگ‌ها
+
+```bash
+# بررسی لاگ پنل
+tail -f /opt/hiddify-manager/log/system/panel.log
+
+# بررسی سرویس
+systemctl status hiddify-panel
+journalctl -u hiddify-panel -n 50
+```
+
+#### 4. نصب مجدد
+
+اگر همه چیز fail شد:
+
+```bash
+cd /opt/hiddify-manager
+rm -rf hiddify-agent-traffic-manager
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+bash install_complete.sh
+```
+
 ## استفاده
 
 ### تنظیم محدودیت ترافیک برای ایجنت
