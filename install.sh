@@ -15,10 +15,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Check if running as root
+# Check if running as root - Allow but warn
 if [ "$EUID" -eq 0 ]; then 
-   echo -e "${RED}Please do not run as root. Run as the hiddify-panel user or with sudo for specific commands.${NC}"
-   exit 1
+   echo -e "${YELLOW}Warning: Running as root. It's recommended to run as hiddify-panel user.${NC}"
+   echo -e "${YELLOW}Continuing anyway...${NC}"
+   echo ""
 fi
 
 # Check if HiddifyPanel is installed
@@ -34,8 +35,16 @@ if [ ! -d "/opt/hiddify-manager/.venv313" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}Step 1: Activating virtual environment...${NC}"
+echo -e "${GREEN}Step 1: Going to HiddifyPanel directory...${NC}"
 cd /opt/hiddify-manager
+
+# Check if we can access venv
+if [ ! -f ".venv313/bin/activate" ]; then
+    echo -e "${RED}Error: Virtual environment activation script not found${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Activating virtual environment...${NC}"
 source .venv313/bin/activate
 
 echo -e "${GREEN}Step 2: Cloning repository...${NC}"
