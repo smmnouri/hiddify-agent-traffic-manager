@@ -13,7 +13,34 @@
 
 ## نصب
 
-### نصب خودکار (توصیه می‌شود)
+### روش 1: اعمال در سورس اصلی (توصیه می‌شود) ⭐
+
+این روش تغییرات را مستقیماً در سورس اصلی HiddifyPanel اعمال می‌کند. مزایا:
+- ✅ یکپارچگی کامل با سورس
+- ✅ بدون نیاز به extension system
+- ✅ کمتر احتمال crash
+- ✅ کنترل کامل
+
+```bash
+cd /opt/hiddify-manager
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+chmod +x apply_to_source.sh
+bash apply_to_source.sh
+systemctl restart hiddify-panel
+```
+
+این اسکریپت به صورت خودکار:
+- ✅ سورس HiddifyPanel را پیدا می‌کند (یا کلون می‌کند)
+- ✅ Backup می‌گیرد
+- ✅ تغییرات را در `models/admin.py` اعمال می‌کند
+- ✅ تغییرات را در `panel/admin/AdminstratorAdmin.py` اعمال می‌کند
+- ✅ User creation hook اضافه می‌کند
+- ✅ Database migration انجام می‌دهد
+
+**برای جزئیات بیشتر، فایل [PATCH_INSTRUCTIONS.md](PATCH_INSTRUCTIONS.md) را مطالعه کنید.**
+
+### روش 2: نصب به عنوان Extension (قدیمی)
 
 برای نصب خودکار که شامل کلون کردن و نصب کامل می‌شود، فقط یک دستور کافی است:
 
