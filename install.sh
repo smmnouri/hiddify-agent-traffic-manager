@@ -3,7 +3,7 @@
 # Usage: bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
 # Or: bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh) YOUR_USERNAME YOUR_REPO_NAME
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,6 +29,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Step 2: Check if Hiddify-Manager exists
+# First, verify the directory actually exists
 if [ ! -d "$HIDDIFY_DIR" ]; then
     echo -e "${YELLOW}Hiddify-Manager not found. Installing Hiddify-Manager first...${NC}"
     echo -e "${YELLOW}This may take several minutes. Please wait...${NC}"
@@ -49,23 +50,31 @@ if [ ! -d "$HIDDIFY_DIR" ]; then
     echo -e "${YELLOW}This may take 5-10 minutes. Please be patient...${NC}"
     for i in {1..60}; do
         sleep 5
-        if [ -d "$HIDDIFY_DIR" ]; then
+        if [ -d "$HIDDIFY_DIR" ] && [ -n "$(ls -A "$HIDDIFY_DIR" 2>/dev/null)" ]; then
             break
         fi
         if [ $((i % 6)) -eq 0 ]; then
             echo -e "${YELLOW}Still waiting... ($((i*5)) seconds elapsed)${NC}"
         fi
     done
-    
-    if [ ! -d "$HIDDIFY_DIR" ]; then
-        echo -e "${RED}✗ Hiddify-Manager directory not found after installation${NC}"
-        echo -e "${YELLOW}The installation may still be in progress.${NC}"
-        echo -e "${YELLOW}Please wait a few more minutes and check manually:${NC}"
-        echo -e "${YELLOW}  ls -la /opt/hiddify-manager${NC}"
-        echo -e "${YELLOW}Or install Hiddify-Manager manually:${NC}"
-        echo -e "${YELLOW}  bash <(curl -s https://i.hiddify.com/release)${NC}"
-        exit 1
-    fi
+fi
+
+# Final verification - check if directory exists and is accessible
+if [ ! -d "$HIDDIFY_DIR" ]; then
+    echo -e "${RED}✗ Hiddify-Manager directory not found: $HIDDIFY_DIR${NC}"
+    echo -e "${YELLOW}The installation may still be in progress.${NC}"
+    echo -e "${YELLOW}Please wait a few more minutes and check manually:${NC}"
+    echo -e "${YELLOW}  ls -la /opt/hiddify-manager${NC}"
+    echo -e "${YELLOW}Or install Hiddify-Manager manually:${NC}"
+    echo -e "${YELLOW}  bash <(curl -s https://i.hiddify.com/release)${NC}"
+    exit 1
+fi
+
+# Verify we can actually access the directory
+if ! cd "$HIDDIFY_DIR" 2>/dev/null; then
+    echo -e "${RED}✗ Cannot access Hiddify-Manager directory: $HIDDIFY_DIR${NC}"
+    echo -e "${YELLOW}Please check permissions and try again${NC}"
+    exit 1
 fi
 
 echo -e "${GREEN}✓ Hiddify-Manager found at $HIDDIFY_DIR${NC}"
@@ -83,14 +92,20 @@ if [ -d "$CUSTOM_REPO_DIR" ]; then
     git pull origin main || git pull origin master || echo "Could not pull"
 else
     echo -e "${GREEN}Cloning custom repository...${NC}"
+    # Verify directory exists before cd
     if [ ! -d "$HIDDIFY_DIR" ]; then
         echo -e "${RED}✗ Hiddify-Manager directory not found: $HIDDIFY_DIR${NC}"
+        echo -e "${YELLOW}Please install Hiddify-Manager first:${NC}"
+        echo -e "${YELLOW}  bash <(curl -s https://i.hiddify.com/release)${NC}"
         exit 1
     fi
-    cd "$HIDDIFY_DIR" || {
+    
+    # Change to directory with error handling
+    if ! cd "$HIDDIFY_DIR"; then
         echo -e "${RED}✗ Cannot access $HIDDIFY_DIR${NC}"
+        echo -e "${YELLOW}Please check permissions${NC}"
         exit 1
-    }
+    fi
     if ! git clone "$REPO_URL" hiddify-panel-custom 2>/dev/null; then
         echo -e "${RED}✗ Failed to clone repository${NC}"
         echo -e "${YELLOW}Creating repository with patches...${NC}"
