@@ -111,51 +111,94 @@ fi
 echo -e "${GREEN}✓ Repository ready${NC}"
 echo ""
 
-# Step 3: Install module
-echo -e "${BLUE}Step 3: Installing module...${NC}"
+# Step 3: Install pip if needed
+echo -e "${BLUE}Step 3: Checking pip...${NC}"
 
-# Check if PIP_CMD is a file or a command
-if [[ "$PIP_CMD" == *"-m pip"* ]]; then
-    # It's python -m pip
-    INSTALL_CMD="$PIP_CMD install -e ."
-else
-    # It's pip executable
-    INSTALL_CMD="$PIP_CMD install -e ."
+if ! $PYTHON_CMD -m pip --version >/dev/null 2>&1; then
+    echo -e "${YELLOW}pip not found, installing pip...${NC}"
+    
+    # Try ensurepip first
+    if $PYTHON_CMD -m ensurepip --upgrade --default-pip 2>&1; then
+        echo -e "${GREEN}✓ pip installed via ensurepip${NC}"
+    else
+        echo -e "${YELLOW}ensurepip failed, trying get-pip.py...${NC}"
+        # Download and install pip
+        curl -sSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+        if $PYTHON_CMD /tmp/get-pip.py 2>&1; then
+            echo -e "${GREEN}✓ pip installed via get-pip.py${NC}"
+            rm -f /tmp/get-pip.py
+        else
+            echo -e "${RED}✗ Failed to install pip${NC}"
+            echo -e "${YELLOW}Trying manual copy method instead...${NC}"
+            goto_manual_copy=true
+        fi
+    fi
 fi
 
-echo -e "${YELLOW}Using: $INSTALL_CMD${NC}"
-
-if eval "$INSTALL_CMD"; then
-    echo -e "${GREEN}✓ Module installed successfully${NC}"
-else
-    echo -e "${YELLOW}Trying alternative method (python -m pip)...${NC}"
+# Step 4: Install module
+if [ "$goto_manual_copy" != "true" ]; then
+    echo -e "${BLUE}Step 4: Installing module...${NC}"
+    
+    echo -e "${YELLOW}Using: $PYTHON_CMD -m pip install -e .${NC}"
+    
     if $PYTHON_CMD -m pip install -e . 2>&1; then
-        echo -e "${GREEN}✓ Module installed successfully (alternative method)${NC}"
+        echo -e "${GREEN}✓ Module installed successfully${NC}"
     else
-        echo -e "${RED}✗ Installation failed!${NC}"
-        echo -e "${YELLOW}Trying manual copy method...${NC}"
-        
-        # Manual copy as last resort
-        MODULE_NAME="hiddify_agent_traffic_manager"
-        SITE_PACKAGES="$VENV_DIR/lib/python3.13/site-packages"
-        
-        if [ -d "$SITE_PACKAGES" ]; then
-            cp -r "$MODULE_NAME" "$SITE_PACKAGES/" 2>/dev/null || {
-                echo -e "${RED}Manual copy also failed${NC}"
-                exit 1
-            }
-            echo -e "${GREEN}✓ Module copied manually${NC}"
-        else
-            echo -e "${RED}Could not find site-packages directory${NC}"
-            exit 1
+        echo -e "${YELLOW}pip install failed, trying manual copy method...${NC}"
+        goto_manual_copy=true
+    fi
+fi
+
+# Manual copy as fallback
+if [ "$goto_manual_copy" = "true" ]; then
+    echo -e "${BLUE}Step 4: Installing module (manual copy)...${NC}"
+    
+    # Find site-packages directory
+    SITE_PACKAGES_DIRS=(
+        "$VENV_DIR/lib/python3.13/site-packages"
+        "$VENV_DIR/lib/python3.12/site-packages"
+        "$VENV_DIR/lib/python3.11/site-packages"
+    )
+    
+    SITE_PACKAGES=""
+    for dir in "${SITE_PACKAGES_DIRS[@]}"; do
+        if [ -d "$dir" ]; then
+            SITE_PACKAGES="$dir"
+            break
         fi
+    done
+    
+    if [ -z "$SITE_PACKAGES" ]; then
+        # Find any site-packages
+        SITE_PACKAGES=$(find "$VENV_DIR/lib" -type d -name "site-packages" 2>/dev/null | head -n1)
+    fi
+    
+    if [ -z "$SITE_PACKAGES" ] || [ ! -d "$SITE_PACKAGES" ]; then
+        echo -e "${RED}Could not find site-packages directory${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}Found site-packages at: $SITE_PACKAGES${NC}"
+    
+    # Copy module
+    MODULE_NAME="hiddify_agent_traffic_manager"
+    if [ -d "$MODULE_NAME" ]; then
+        echo -e "${GREEN}Copying module to site-packages...${NC}"
+        cp -r "$MODULE_NAME" "$SITE_PACKAGES/" 2>&1 || {
+            echo -e "${RED}Manual copy failed${NC}"
+            exit 1
+        }
+        echo -e "${GREEN}✓ Module copied successfully${NC}"
+    else
+        echo -e "${RED}Module directory not found: $MODULE_NAME${NC}"
+        exit 1
     fi
 fi
 
 echo ""
 
-# Step 4: Verify installation
-echo -e "${BLUE}Step 4: Verifying installation...${NC}"
+# Step 5: Verify installation
+echo -e "${BLUE}Step 5: Verifying installation...${NC}"
 
 if $PYTHON_CMD -c "import hiddify_agent_traffic_manager; print('OK')" 2>/dev/null; then
     echo -e "${GREEN}✓ Module verification successful${NC}"
@@ -167,8 +210,8 @@ fi
 
 echo ""
 
-# Step 5: Find and edit base.py for integration
-echo -e "${BLUE}Step 5: Integrating with HiddifyPanel...${NC}"
+# Step 6: Find and edit base.py for integration
+echo -e "${BLUE}Step 6: Integrating with HiddifyPanel...${NC}"
 
 # Find base.py (where create_app is defined)
 BASE_PY_PATHS=(
@@ -339,8 +382,8 @@ fi
 
 echo ""
 
-# Step 6: Restart services
-echo -e "${BLUE}Step 6: Restarting services...${NC}"
+# Step 7: Restart services
+echo -e "${BLUE}Step 7: Restarting services...${NC}"
 
 if systemctl is-active --quiet hiddify-panel 2>/dev/null; then
     echo -e "${GREEN}Restarting hiddify-panel...${NC}"
@@ -360,8 +403,8 @@ fi
 
 echo ""
 
-# Step 7: Final verification
-echo -e "${BLUE}Step 7: Final verification...${NC}"
+# Step 8: Final verification
+echo -e "${BLUE}Step 8: Final verification...${NC}"
 
 sleep 2
 
