@@ -13,13 +13,29 @@
 
 ## نصب
 
-### روش 1: اعمال در سورس اصلی (توصیه می‌شود) ⭐
+### روش 1: ایجاد Repository سفارشی خودتان (توصیه می‌شود) ⭐
 
-این روش تغییرات را مستقیماً در سورس اصلی HiddifyPanel اعمال می‌کند. مزایا:
-- ✅ یکپارچگی کامل با سورس
-- ✅ بدون نیاز به extension system
-- ✅ کمتر احتمال crash
-- ✅ کنترل کامل
+این روش یک repository سفارشی از HiddifyPanel با تغییرات اعمال شده برای شما می‌سازد:
+
+```bash
+cd /opt/hiddify-manager
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+chmod +x setup_custom_repo.sh
+bash setup_custom_repo.sh
+```
+
+این اسکریپت:
+- ✅ HiddifyPanel را کلون می‌کند
+- ✅ Remote را به repository شما تغییر می‌دهد
+- ✅ تمام تغییرات را اعمال می‌کند
+- ✅ به repository شما commit و push می‌کند
+
+**بعد از این، می‌توانید از repository خودتان استفاده کنید!**
+
+### روش 2: اعمال در سورس محلی
+
+اگر می‌خواهید تغییرات را در سورس محلی اعمال کنید:
 
 ```bash
 cd /opt/hiddify-manager
