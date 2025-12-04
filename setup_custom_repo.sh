@@ -11,8 +11,20 @@ NC='\033[0m'
 
 HIDDIFY_DIR="/opt/hiddify-manager"
 CUSTOM_REPO_DIR="$HIDDIFY_DIR/hiddify-panel-custom"
-GITHUB_USER="smmnouri"  # تغییر دهید به username خودتان
-REPO_NAME="hiddify-panel-custom"  # یا نام دلخواه
+
+# Get GitHub user from git config or ask
+GITHUB_USER=$(git config --global user.name 2>/dev/null || echo "smmnouri")
+REPO_NAME="hiddify-panel-custom"
+
+# Ask for GitHub username if not set
+if [ -z "$GITHUB_USER" ] || [ "$GITHUB_USER" = "smmnouri" ]; then
+    read -p "Enter your GitHub username [smmnouri]: " input_user
+    GITHUB_USER=${input_user:-smmnouri}
+fi
+
+# Ask for repo name
+read -p "Enter repository name [hiddify-panel-custom]: " input_repo
+REPO_NAME=${input_repo:-hiddify-panel-custom}
 
 echo -e "${BLUE}==========================================${NC}"
 echo -e "${BLUE}Setup Custom HiddifyPanel Repository${NC}"
@@ -350,18 +362,46 @@ echo -e "${GREEN}✓ Changes committed${NC}"
 echo ""
 
 # Step 5: Push to user's repo
-echo -e "${BLUE}Step 5: Pushing to GitHub...${NC}"
-echo -e "${YELLOW}Note: Make sure you have set up the remote and have push access${NC}"
+echo -e "${BLUE}Step 5: Setting up GitHub repository...${NC}"
+echo -e "${YELLOW}Repository URL: https://github.com/$GITHUB_USER/$REPO_NAME${NC}"
 
+# Check if repo exists on GitHub
+REPO_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "https://github.com/$GITHUB_USER/$REPO_NAME" 2>/dev/null || echo "404")
+
+if [ "$REPO_EXISTS" != "200" ]; then
+    echo -e "${YELLOW}Repository does not exist on GitHub${NC}"
+    echo -e "${YELLOW}Please create it first:${NC}"
+    echo "  1. Go to: https://github.com/new"
+    echo "  2. Repository name: $REPO_NAME"
+    echo "  3. Make it private or public (your choice)"
+    echo "  4. Don't initialize with README"
+    echo ""
+    read -p "Press Enter after creating the repository..."
+fi
+
+# Set remote
+git remote remove origin 2>/dev/null || true
+git remote add origin "https://github.com/$GITHUB_USER/$REPO_NAME.git" 2>/dev/null || \
+    git remote set-url origin "https://github.com/$GITHUB_USER/$REPO_NAME.git"
+
+echo -e "${GREEN}✓ Remote set to: https://github.com/$GITHUB_USER/$REPO_NAME.git${NC}"
+
+# Push
 read -p "Do you want to push to GitHub now? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    git push origin main || git push origin master || echo -e "${YELLOW}Could not push. Please push manually.${NC}"
+    echo -e "${BLUE}Pushing to GitHub...${NC}"
+    git push -u origin main 2>/dev/null || git push -u origin master 2>/dev/null || {
+        echo -e "${YELLOW}Could not push automatically.${NC}"
+        echo -e "${YELLOW}You may need to authenticate. Try:${NC}"
+        echo "  cd $CUSTOM_REPO_DIR"
+        echo "  git push -u origin main"
+    }
     echo -e "${GREEN}✓ Pushed to GitHub${NC}"
 else
     echo -e "${YELLOW}Skipped push. You can push later with:${NC}"
     echo "  cd $CUSTOM_REPO_DIR"
-    echo "  git push origin main"
+    echo "  git push -u origin main"
 fi
 
 echo ""
