@@ -14,26 +14,34 @@ from ..utils.traffic_checker import AgentTrafficChecker
 def extend_admin_user_view(admin_view):
     """Extend AdminUser admin view with traffic management"""
     
-    # Add traffic limit field to form
-    original_form_columns = admin_view.form_columns
+    try:
+        # Add traffic limit field to form
+        original_form_columns = admin_view.form_columns
+        
+        if original_form_columns:
+            if 'traffic_limit_GB' not in original_form_columns:
+                admin_view.form_columns = list(original_form_columns) + ['traffic_limit_GB']
+        else:
+            admin_view.form_columns = ['traffic_limit_GB']
+    except Exception as e:
+        from loguru import logger
+        logger.warning(f"Could not add traffic_limit_GB to form_columns: {e}")
     
-    if original_form_columns:
-        if 'traffic_limit_GB' not in original_form_columns:
-            admin_view.form_columns = list(original_form_columns) + ['traffic_limit_GB']
-    else:
-        admin_view.form_columns = ['traffic_limit_GB']
-    
-    # Add traffic limit and traffic info to column list
-    original_column_list = admin_view.column_list
-    
-    if original_column_list:
-        # Add traffic columns if not already present
-        traffic_columns = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
-        for col in traffic_columns:
-            if col not in original_column_list:
-                admin_view.column_list = list(original_column_list) + [col]
-    else:
-        admin_view.column_list = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+    try:
+        # Add traffic limit and traffic info to column list
+        original_column_list = admin_view.column_list
+        
+        if original_column_list:
+            # Add traffic columns if not already present
+            traffic_columns = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+            for col in traffic_columns:
+                if col not in original_column_list:
+                    admin_view.column_list = list(original_column_list) + [col]
+        else:
+            admin_view.column_list = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+    except Exception as e:
+        from loguru import logger
+        logger.warning(f"Could not add traffic columns to column_list: {e}")
     
     # Add custom column formatters
     def _format_traffic_limit(view, context, model, name):
@@ -83,11 +91,17 @@ def extend_admin_user_view(admin_view):
             return f'<span class="badge badge-success">OK ({usage_percent:.1f}%)</span>'
     
     # Add custom columns
-    admin_view.column_formatters = getattr(admin_view, 'column_formatters', {})
-    admin_view.column_formatters['traffic_limit_GB'] = _format_traffic_limit
-    admin_view.column_formatters['total_traffic'] = _format_total_traffic
-    admin_view.column_formatters['remaining_traffic'] = _format_remaining_traffic
-    admin_view.column_formatters['traffic_status'] = _format_traffic_status
+    try:
+        admin_view.column_formatters = getattr(admin_view, 'column_formatters', {})
+        if not isinstance(admin_view.column_formatters, dict):
+            admin_view.column_formatters = {}
+        admin_view.column_formatters['traffic_limit_GB'] = _format_traffic_limit
+        admin_view.column_formatters['total_traffic'] = _format_total_traffic
+        admin_view.column_formatters['remaining_traffic'] = _format_remaining_traffic
+        admin_view.column_formatters['traffic_status'] = _format_traffic_status
+    except Exception as e:
+        from loguru import logger
+        logger.warning(f"Could not add column formatters: {e}")
     
     # Add custom action
     @admin_view.action('check_traffic', _('Check Traffic & Disable if Exceeded'))
