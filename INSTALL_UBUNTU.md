@@ -146,6 +146,22 @@ rm -rf hiddify-agent-traffic-manager
 
 ## مشکلات رایج
 
+### مشکل: externally-managed-environment
+**خطا**: `error: externally-managed-environment`
+
+**راه‌حل**: در Ubuntu 22.04+ باید از pip از virtual environment استفاده کنید:
+
+```bash
+# به جای pip install، از pip از venv استفاده کنید:
+/opt/hiddify-manager/.venv313/bin/pip install -e .
+
+# یا venv را فعال کنید:
+source /opt/hiddify-manager/.venv313/bin/activate
+pip install -e .
+```
+
+**نکته**: هرگز از `--break-system-packages` استفاده نکنید!
+
 ### مشکل: ModuleNotFoundError
 **راه‌حل**: مطمئن شوید که virtual environment فعال است و ماژول نصب شده است.
 

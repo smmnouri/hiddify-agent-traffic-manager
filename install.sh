@@ -49,7 +49,8 @@ else
 fi
 
 echo -e "${GREEN}Step 3: Installing module...${NC}"
-pip install -e .
+# Use pip from venv explicitly
+/opt/hiddify-manager/.venv313/bin/pip install -e .
 
 echo -e "${GREEN}Step 4: Installation completed!${NC}"
 echo ""

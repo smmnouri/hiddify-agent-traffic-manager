@@ -27,9 +27,9 @@ source .venv313/bin/activate  # یا مسیر venv شما
 # 3. کلون کردن ماژول
 git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
 
-# 4. نصب ماژول
+# 4. نصب ماژول (استفاده از pip از venv)
 cd hiddify-agent-traffic-manager
-pip install -e .
+/opt/hiddify-manager/.venv313/bin/pip install -e .
 
 # 5. Integration با HiddifyPanel
 # فایل wsgi_app.py یا app.py اصلی HiddifyPanel را ویرایش کنید
@@ -236,7 +236,16 @@ cd /opt/hiddify-manager && git clone https://github.com/smmnouri/hiddify-agent-t
 ### روش 2: دستورات دستی
 
 ```bash
-cd /opt/hiddify-manager && source .venv313/bin/activate && git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git && cd hiddify-agent-traffic-manager && pip install -e .
+cd /opt/hiddify-manager
+source .venv313/bin/activate
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+pip install -e .
+```
+
+**توجه**: اگر خطای `externally-managed-environment` دریافت کردید، از pip از venv استفاده کنید:
+```bash
+/opt/hiddify-manager/.venv313/bin/pip install -e .
 ```
 
 **توجه**: بعد از نصب، باید ماژول را به HiddifyPanel اضافه کنید (بخش Integration را ببینید).
