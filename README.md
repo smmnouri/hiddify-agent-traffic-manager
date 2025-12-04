@@ -13,29 +13,46 @@
 
 ## نصب
 
-### نصب در Ubuntu (HiddifyPanel)
+### نصب خودکار (توصیه می‌شود)
 
-برای نصب این ماژول در سرور Ubuntu که HiddifyPanel روی آن نصب است، دستورات زیر را اجرا کنید:
+برای نصب خودکار که شامل کلون کردن و نصب کامل می‌شود، فقط یک دستور کافی است:
+
+```bash
+cd /opt/hiddify-manager && bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/auto_install.sh)
+```
+
+یا اگر `curl` ندارید:
+
+```bash
+cd /opt/hiddify-manager
+git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
+cd hiddify-agent-traffic-manager
+bash auto_install.sh
+```
+
+این اسکریپت به صورت خودکار:
+- ✅ Repository را کلون می‌کند (یا به‌روز می‌کند)
+- ✅ ماژول را نصب می‌کند
+- ✅ با HiddifyPanel یکپارچه می‌کند
+- ✅ سرویس را restart می‌کند
+
+### نصب دستی در Ubuntu (HiddifyPanel)
+
+اگر می‌خواهید به صورت دستی نصب کنید:
 
 ```bash
 # 1. رفتن به مسیر HiddifyPanel
 cd /opt/hiddify-manager
 
-# 2. فعال‌سازی virtual environment (اگر از venv استفاده می‌کنید)
-source .venv313/bin/activate  # یا مسیر venv شما
-
-# 3. کلون کردن ماژول
+# 2. کلون کردن ماژول
 git clone https://github.com/smmnouri/hiddify-agent-traffic-manager.git
 
-# 4. نصب ماژول (استفاده از pip از venv)
+# 3. نصب ماژول
 cd hiddify-agent-traffic-manager
-/opt/hiddify-manager/.venv313/bin/pip install -e .
-
-# 5. Integration با HiddifyPanel
-# فایل wsgi_app.py یا app.py اصلی HiddifyPanel را ویرایش کنید
-# مسیر معمول: /opt/hiddify-manager/.venv313/lib/python3.13/site-packages/hiddifypanel/apps/wsgi_app.py
-# یا اگر از source استفاده می‌کنید: /opt/hiddify-manager/hiddify-panel/src/hiddifypanel/apps/wsgi_app.py
+bash install_complete.sh
 ```
+
+این اسکریپت (`install_complete.sh`) همه مراحل را خودکار انجام می‌دهد.
 
 ### Integration با HiddifyPanel
 
