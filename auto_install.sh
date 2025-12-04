@@ -66,7 +66,20 @@ if [ ! -f "install_complete.sh" ]; then
 fi
 
 chmod +x install_complete.sh
-bash install_complete.sh
+
+# Check if running as root, warn but continue
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${YELLOW}Running install_complete.sh as root...${NC}"
+    bash install_complete.sh
+else
+    # Try to run as hiddify-panel user if exists
+    if id "hiddify-panel" &>/dev/null; then
+        echo -e "${GREEN}Running install_complete.sh as hiddify-panel user...${NC}"
+        sudo -u hiddify-panel bash install_complete.sh || bash install_complete.sh
+    else
+        bash install_complete.sh
+    fi
+fi
 
 echo ""
 echo -e "${GREEN}==========================================${NC}"
