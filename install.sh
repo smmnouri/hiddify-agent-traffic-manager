@@ -31,27 +31,39 @@ fi
 # Step 2: Check if Hiddify-Manager exists
 if [ ! -d "$HIDDIFY_DIR" ]; then
     echo -e "${YELLOW}Hiddify-Manager not found. Installing Hiddify-Manager first...${NC}"
-    bash <(curl -s https://get.hiddify.com/install.sh) || {
-        echo -e "${RED}✗ Failed to install Hiddify-Manager${NC}"
-        exit 1
-    }
+    echo -e "${YELLOW}This may take several minutes. Please wait...${NC}"
     
-    # Wait a bit and verify installation
-    sleep 2
-    if [ ! -d "$HIDDIFY_DIR" ]; then
-        echo -e "${YELLOW}Waiting for Hiddify-Manager installation to complete...${NC}"
-        for i in {1..10}; do
-            sleep 2
-            if [ -d "$HIDDIFY_DIR" ]; then
-                break
-            fi
-            echo -e "${YELLOW}Still waiting... ($i/10)${NC}"
-        done
+    # Try the official installation URL
+    if ! bash <(curl -s https://i.hiddify.com/release); then
+        echo -e "${YELLOW}First method failed, trying alternative...${NC}"
+        if ! bash <(curl -s https://get.hiddify.com/install.sh); then
+            echo -e "${RED}✗ Failed to install Hiddify-Manager${NC}"
+            echo -e "${YELLOW}Please install Hiddify-Manager manually first:${NC}"
+            echo -e "${YELLOW}  bash <(curl -s https://i.hiddify.com/release)${NC}"
+            exit 1
+        fi
     fi
+    
+    # Wait and verify installation - Hiddify installation can take 5-10 minutes
+    echo -e "${YELLOW}Waiting for Hiddify-Manager installation to complete...${NC}"
+    echo -e "${YELLOW}This may take 5-10 minutes. Please be patient...${NC}"
+    for i in {1..60}; do
+        sleep 5
+        if [ -d "$HIDDIFY_DIR" ]; then
+            break
+        fi
+        if [ $((i % 6)) -eq 0 ]; then
+            echo -e "${YELLOW}Still waiting... ($((i*5)) seconds elapsed)${NC}"
+        fi
+    done
     
     if [ ! -d "$HIDDIFY_DIR" ]; then
         echo -e "${RED}✗ Hiddify-Manager directory not found after installation${NC}"
-        echo -e "${YELLOW}Please install Hiddify-Manager manually first${NC}"
+        echo -e "${YELLOW}The installation may still be in progress.${NC}"
+        echo -e "${YELLOW}Please wait a few more minutes and check manually:${NC}"
+        echo -e "${YELLOW}  ls -la /opt/hiddify-manager${NC}"
+        echo -e "${YELLOW}Or install Hiddify-Manager manually:${NC}"
+        echo -e "${YELLOW}  bash <(curl -s https://i.hiddify.com/release)${NC}"
         exit 1
     fi
 fi
