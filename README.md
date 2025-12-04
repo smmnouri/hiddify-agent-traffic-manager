@@ -21,14 +21,21 @@
 bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh)
 ```
 
+یا اگر repository دیگری دارید:
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/install.sh) YOUR_USERNAME YOUR_REPO_NAME
+```
+
 این دستور:
 - ✅ Hiddify-Manager را نصب می‌کند (اگر نصب نباشد)
 - ✅ Repository سفارشی شما را کلون می‌کند
+- ✅ اگر repository وجود نداشت، آن را می‌سازد و patches را اعمال می‌کند
 - ✅ HiddifyPanel را از repository شما نصب می‌کند
 - ✅ Database migration انجام می‌دهد
 - ✅ سرویس‌ها را restart می‌کند
 
-**نکته**: قبل از اجرا، مطمئن شوید که repository `hiddify-panel-custom` در GitHub شما وجود دارد.
+**نکته**: اگر repository شما وجود نداشته باشد، اسکریپت به صورت خودکار آن را می‌سازد و patches را اعمال می‌کند.
 
 ### روش 2: ایجاد Repository سفارشی خودتان ⭐⭐
 
