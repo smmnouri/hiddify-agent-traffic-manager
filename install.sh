@@ -38,14 +38,21 @@ fi
 echo -e "${GREEN}Step 1: Going to HiddifyPanel directory...${NC}"
 cd /opt/hiddify-manager
 
-# Check if we can access venv
-if [ ! -f ".venv313/bin/activate" ]; then
-    echo -e "${RED}Error: Virtual environment activation script not found${NC}"
+# Check if venv exists
+if [ ! -d ".venv313" ]; then
+    echo -e "${RED}Error: Virtual environment not found at /opt/hiddify-manager/.venv313${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}Activating virtual environment...${NC}"
-source .venv313/bin/activate
+# Check if pip exists in venv
+if [ ! -f ".venv313/bin/pip" ]; then
+    echo -e "${RED}Error: pip not found in virtual environment${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Using pip from virtual environment...${NC}"
+# We'll use the full path to pip from venv to avoid externally-managed-environment error
+PIP_CMD="/opt/hiddify-manager/.venv313/bin/pip"
 
 echo -e "${GREEN}Step 2: Cloning repository...${NC}"
 if [ -d "hiddify-agent-traffic-manager" ]; then
@@ -58,8 +65,9 @@ else
 fi
 
 echo -e "${GREEN}Step 3: Installing module...${NC}"
-# Use pip from venv explicitly
-/opt/hiddify-manager/.venv313/bin/pip install -e .
+# Use pip from venv explicitly to avoid externally-managed-environment error
+echo -e "${YELLOW}Using: $PIP_CMD install -e .${NC}"
+$PIP_CMD install -e .
 
 echo -e "${GREEN}Step 4: Installation completed!${NC}"
 echo ""
