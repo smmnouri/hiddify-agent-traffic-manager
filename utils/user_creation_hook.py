@@ -5,7 +5,6 @@ from sqlalchemy import event
 from hiddifypanel.models.user import User
 from hiddifypanel.models.admin import AdminUser
 from loguru import logger
-from apiflask import abort
 from flask_babel import gettext as _
 
 
@@ -51,7 +50,12 @@ def setup_user_creation_hook():
                 f"User creation blocked for agent {agent.name} (ID: {agent_id}). "
                 f"Reason: {error_msg}"
             )
-            abort(400, error_msg or _("Cannot create user due to traffic limit"))
+            from sqlalchemy.exc import IntegrityError
+            raise IntegrityError(
+                statement=None,
+                params=None,
+                orig=ValueError(error_msg or _("Cannot create user due to traffic limit"))
+            )
     
     @event.listens_for(User, 'before_update', propagate=True)
     def check_traffic_before_user_update(mapper, connection, target):
@@ -113,7 +117,12 @@ def setup_user_creation_hook():
                 f"User update blocked for agent {agent.name} (ID: {agent_id}). "
                 f"New total would exceed limit: {new_total/(1024**3):.2f} GB > {agent.traffic_limit_GB} GB"
             )
-            abort(400, _("Updating user traffic limit would exceed agent's traffic limit"))
+            from sqlalchemy.exc import IntegrityError
+            raise IntegrityError(
+                statement=None,
+                params=None,
+                orig=ValueError(_("Updating user traffic limit would exceed agent's traffic limit"))
+            )
 
 
 def init_user_creation_hook():
