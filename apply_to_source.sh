@@ -10,7 +10,6 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 HIDDIFY_DIR="/opt/hiddify-manager"
-SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
 VENV_DIR="$HIDDIFY_DIR/.venv313"
 
 echo -e "${BLUE}==========================================${NC}"
@@ -19,27 +18,61 @@ echo -e "${BLUE}to HiddifyPanel Source${NC}"
 echo -e "${BLUE}==========================================${NC}"
 echo ""
 
-# Step 1: Find source
+# Step 1: Find source - try multiple locations
 echo -e "${BLUE}Step 1: Finding HiddifyPanel source...${NC}"
-if [ ! -d "$SOURCE_DIR" ]; then
+
+SOURCE_DIR=""
+# Try hiddify-panel-custom first (from install.sh)
+if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ]; then
+    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
+    echo -e "${GREEN}Found in hiddify-panel-custom${NC}"
+# Try hiddify-panel
+elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ]; then
+    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
+    echo -e "${GREEN}Found in hiddify-panel${NC}"
+# Try to find it
+else
     SOURCE_DIR=$(find "$HIDDIFY_DIR" -type d -name "hiddifypanel" -path "*/src/hiddifypanel" 2>/dev/null | head -n1 | sed 's|/hiddifypanel$||')
+    if [ -n "$SOURCE_DIR" ]; then
+        echo -e "${GREEN}Found via search${NC}"
+    fi
 fi
 
+# If still not found, try current directory
+if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
+    if [ -d "src" ] && [ -d "src/hiddifypanel" ]; then
+        SOURCE_DIR="$(pwd)/src"
+        echo -e "${GREEN}Found in current directory${NC}"
+    fi
+fi
+
+# If still not found, clone it
 if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
     echo -e "${YELLOW}Source not found. Cloning...${NC}"
     cd "$HIDDIFY_DIR"
-    if [ -d "hiddify-panel" ]; then
-        echo -e "${YELLOW}Directory exists, updating...${NC}"
+    if [ -d "hiddify-panel-custom" ]; then
+        echo -e "${YELLOW}hiddify-panel-custom exists, using it...${NC}"
+        cd hiddify-panel-custom
+        if [ ! -d "src" ]; then
+            git pull || echo "Could not pull"
+        fi
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
+    elif [ -d "hiddify-panel" ]; then
+        echo -e "${YELLOW}hiddify-panel exists, using it...${NC}"
         cd hiddify-panel
         git pull || echo "Could not pull"
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
     else
-        git clone https://github.com/hiddify/HiddifyPanel.git hiddify-panel
+        git clone https://github.com/hiddify/HiddifyPanel.git hiddify-panel-custom
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
     fi
-    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
 fi
 
 if [ ! -d "$SOURCE_DIR" ]; then
     echo -e "${RED}✗ Could not find or create source directory${NC}"
+    echo -e "${YELLOW}Tried:${NC}"
+    echo "  - $HIDDIFY_DIR/hiddify-panel-custom/src"
+    echo "  - $HIDDIFY_DIR/hiddify-panel/src"
     exit 1
 fi
 
