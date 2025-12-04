@@ -74,10 +74,47 @@ def extend_admin_user_view(admin_view):
     try:
         if not hasattr(admin_view, 'form_overrides'):
             admin_view.form_overrides = {}
-        admin_view.form_overrides['traffic_limit_GB'] = TrafficLimitField
+        elif not isinstance(admin_view.form_overrides, dict):
+            admin_view.form_overrides = {}
+        
+        # Preserve existing form_overrides
+        existing_overrides = admin_view.form_overrides.copy()
+        existing_overrides['traffic_limit_GB'] = TrafficLimitField
+        admin_view.form_overrides = existing_overrides
         logger.debug("Added TrafficLimitField to form_overrides")
     except Exception as e:
         logger.warning(f"Could not add TrafficLimitField to form_overrides: {e}")
+    
+    # Override on_model_change to handle traffic_limit_GB
+    original_on_model_change = admin_view.on_model_change
+    def on_model_change_with_traffic(self, form, model, is_created):
+        """Handle traffic_limit_GB field in form"""
+        try:
+            # Get traffic_limit_GB from form
+            if hasattr(form, 'traffic_limit_GB') and form.traffic_limit_GB.data is not None:
+                # The TrafficLimitField already converts GB to bytes
+                # But we need to save it to the database
+                from hiddifypanel.database import db
+                traffic_limit_bytes = form.traffic_limit_GB.data
+                
+                # Update the model's traffic_limit directly
+                db.session.execute(
+                    db.text("UPDATE admin_user SET traffic_limit = :limit WHERE id = :id"),
+                    {"limit": traffic_limit_bytes, "id": model.id}
+                )
+                logger.debug(f"Updated traffic_limit for admin {model.id}: {traffic_limit_bytes} bytes")
+        except Exception as e:
+            logger.warning(f"Error handling traffic_limit_GB in on_model_change: {e}")
+        
+        # Call original on_model_change
+        if original_on_model_change:
+            try:
+                original_on_model_change(self, form, model, is_created)
+            except Exception as e:
+                logger.warning(f"Error in original on_model_change: {e}")
+    
+    admin_view.on_model_change = on_model_change_with_traffic
+    logger.debug("Overrode on_model_change to handle traffic_limit_GB")
     
     # Add column labels
     try:
