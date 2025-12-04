@@ -16,19 +16,52 @@ echo -e "${BLUE}Direct Patch Application${NC}"
 echo -e "${BLUE}==========================================${NC}"
 echo ""
 
-# Find source directory
+# Find source directory - check multiple locations
 SOURCE_DIR=""
-if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ]; then
-    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
-elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ]; then
-    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
-else
+
+# First, check if we're already in a source directory
+if [ -d "src/hiddifypanel" ] || [ -d "hiddifypanel" ]; then
+    if [ -d "src" ]; then
+        SOURCE_DIR="$(pwd)/src"
+        echo -e "${GREEN}Found source in current directory: $SOURCE_DIR${NC}"
+    elif [ -d "hiddifypanel" ]; then
+        SOURCE_DIR="$(pwd)"
+        echo -e "${GREEN}Found source in current directory: $SOURCE_DIR${NC}"
+    fi
+fi
+
+# If not found, check standard locations
+if [ -z "$SOURCE_DIR" ]; then
+    if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ]; then
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
+        echo -e "${GREEN}Found in hiddify-panel-custom${NC}"
+    elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ]; then
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
+        echo -e "${GREEN}Found in hiddify-panel${NC}"
+    fi
+fi
+
+# If still not found, search
+if [ -z "$SOURCE_DIR" ]; then
+    FOUND=$(find "$HIDDIFY_DIR" -type d -name "hiddifypanel" -path "*/src/hiddifypanel" 2>/dev/null | head -n1 | sed 's|/hiddifypanel$||')
+    if [ -n "$FOUND" ] && [ -d "$FOUND" ]; then
+        SOURCE_DIR="$FOUND"
+        echo -e "${GREEN}Found via search: $SOURCE_DIR${NC}"
+    fi
+fi
+
+if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
     echo -e "${RED}✗ Source directory not found${NC}"
-    echo -e "${YELLOW}Please make sure HiddifyPanel is cloned${NC}"
+    echo -e "${YELLOW}Searched in:${NC}"
+    echo "  - Current directory: $(pwd)"
+    echo "  - $HIDDIFY_DIR/hiddify-panel-custom/src"
+    echo "  - $HIDDIFY_DIR/hiddify-panel/src"
+    echo ""
+    echo -e "${YELLOW}Please make sure HiddifyPanel is cloned or run from the correct directory${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}Source directory: $SOURCE_DIR${NC}"
+echo -e "${GREEN}Using source directory: $SOURCE_DIR${NC}"
 echo ""
 
 # Patch 1: models/admin.py
