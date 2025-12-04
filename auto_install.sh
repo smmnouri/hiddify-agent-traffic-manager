@@ -180,19 +180,32 @@ if [ "$goto_manual_copy" = "true" ]; then
     
     echo -e "${GREEN}Found site-packages at: $SITE_PACKAGES${NC}"
     
-    # Copy module
-    MODULE_NAME="hiddify_agent_traffic_manager"
-    if [ -d "$MODULE_NAME" ]; then
-        echo -e "${GREEN}Copying module to site-packages...${NC}"
-        cp -r "$MODULE_NAME" "$SITE_PACKAGES/" 2>&1 || {
-            echo -e "${RED}Manual copy failed${NC}"
-            exit 1
-        }
-        echo -e "${GREEN}✓ Module copied successfully${NC}"
-    else
-        echo -e "${RED}Module directory not found: $MODULE_NAME${NC}"
-        exit 1
-    fi
+    # Copy module - we need to create the package directory structure
+    MODULE_PACKAGE_NAME="hiddify_agent_traffic_manager"
+    MODULE_SRC_DIR="$MODULE_DIR"
+    
+    echo -e "${GREEN}Creating package structure...${NC}"
+    
+    # Create package directory in site-packages
+    PACKAGE_DIR="$SITE_PACKAGES/$MODULE_PACKAGE_NAME"
+    mkdir -p "$PACKAGE_DIR"
+    
+    # Copy all Python files and directories
+    echo -e "${GREEN}Copying files...${NC}"
+    
+    # Copy main files
+    for file in __init__.py models utils tasks admin api; do
+        if [ -e "$MODULE_SRC_DIR/$file" ]; then
+            cp -r "$MODULE_SRC_DIR/$file" "$PACKAGE_DIR/" 2>&1 || {
+                echo -e "${YELLOW}Warning: Could not copy $file${NC}"
+            }
+        fi
+    done
+    
+    # Also copy any .py files in root
+    find "$MODULE_SRC_DIR" -maxdepth 1 -name "*.py" -exec cp {} "$PACKAGE_DIR/" \; 2>/dev/null || true
+    
+    echo -e "${GREEN}✓ Module copied successfully to $PACKAGE_DIR${NC}"
 fi
 
 echo ""
