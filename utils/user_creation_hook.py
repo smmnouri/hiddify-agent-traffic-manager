@@ -41,7 +41,7 @@ def setup_user_creation_hook():
             return  # No limit set, allow creation
         
         # Get user traffic limit
-        user_traffic_limit_GB = target.usage_limit_GB if target.usage_limit else None
+        user_traffic_limit_GB = target.usage_limit_GB if hasattr(target, 'usage_limit') and target.usage_limit else None
         
         # Check if agent can create this user
         can_create, error_msg = agent.can_create_user_with_traffic(user_traffic_limit_GB)
@@ -56,9 +56,19 @@ def setup_user_creation_hook():
     @event.listens_for(User, 'before_update', propagate=True)
     def check_traffic_before_user_update(mapper, connection, target):
         """بررسی ترافیک قبل از update کردن کاربر (اگر usage_limit تغییر کند)"""
-        # Only check if usage_limit is being updated
-        if 'usage_limit' not in target.__dict__ and 'usage_limit_GB' not in target.__dict__:
-            return
+        from sqlalchemy.orm import inspect
+        
+        # Check if usage_limit is being updated using SQLAlchemy inspect
+        insp = inspect(target)
+        if not insp.has_identity:
+            return  # New object, not an update
+        
+        # Get changed attributes
+        attrs = insp.attrs
+        usage_limit_changed = 'usage_limit' in attrs and attrs['usage_limit'].history.has_changes()
+        
+        if not usage_limit_changed:
+            return  # usage_limit not changed, skip check
         
         agent_id = target.added_by
         if not agent_id:
@@ -75,15 +85,27 @@ def setup_user_creation_hook():
         if agent.traffic_limit_GB is None:
             return
         
-        # Get current total traffic (excluding this user's current limit)
-        current_total = agent.get_total_traffic()
-        current_user_limit = target.usage_limit or 0
+        # Get old and new usage_limit values
+        old_value = attrs['usage_limit'].history.deleted[0] if attrs['usage_limit'].history.deleted else 0
+        new_value = target.usage_limit or 0
         
-        # Get new user limit
-        new_user_limit = target.usage_limit if hasattr(target, 'usage_limit') else target.usage_limit_GB * (1024**3)
+        # Get current total traffic (excluding this user's old limit, including new limit)
+        # We need to get total from database excluding this user, then add new limit
+        from hiddifypanel.database import db
+        from hiddifypanel.models.user import User
+        from sqlalchemy import func
         
-        # Calculate new total
-        new_total = current_total - current_user_limit + new_user_limit
+        admin_ids = agent.recursive_sub_admins_ids()
+        # Get total traffic excluding this user
+        total_excluding_user = db.session.query(
+            func.coalesce(func.sum(User.current_usage), 0)
+        ).filter(
+            User.added_by.in_(admin_ids),
+            User.id != target.id
+        ).scalar() or 0
+        
+        # Calculate new total with new user limit
+        new_total = total_excluding_user + new_value
         agent_limit = int(agent.traffic_limit_GB * (1024**3))
         
         if new_total > agent_limit:

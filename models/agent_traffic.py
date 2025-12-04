@@ -22,10 +22,21 @@ def init_agent_traffic(app: Flask):
         
         if 'traffic_limit' not in columns:
             logger.info("Adding traffic_limit column to admin_user table...")
-            with db.engine.connect() as conn:
-                conn.execute(db.text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
-                conn.commit()
-            logger.success("traffic_limit column added successfully")
+            try:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+                    conn.commit()
+                logger.success("traffic_limit column added successfully")
+            except Exception as e:
+                logger.warning(f"Could not add traffic_limit column (might already exist): {e}")
+                # Try alternative method
+                try:
+                    db.session.execute(db.text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+                    db.session.commit()
+                    logger.success("traffic_limit column added successfully (alternative method)")
+                except Exception as e2:
+                    logger.error(f"Failed to add traffic_limit column: {e2}")
+                    # Continue anyway, column might already exist
         else:
             logger.debug("traffic_limit column already exists")
     except Exception as e:

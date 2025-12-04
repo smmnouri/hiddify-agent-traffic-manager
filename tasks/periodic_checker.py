@@ -17,7 +17,21 @@ def setup_periodic_checker(app: Flask):
     and disable their users if necessary.
     """
     try:
-        from hiddifypanel.apps.celery_app import celery_app
+        # Try to get celery_app from various sources
+        celery_app = None
+        
+        # Method 1: Try from hiddifypanel.apps.celery_app
+        try:
+            from hiddifypanel.apps.celery_app import celery_app
+        except ImportError:
+            # Method 2: Try from app.extensions
+            if hasattr(app, 'extensions') and 'celery' in app.extensions:
+                celery_app = app.extensions['celery']
+            else:
+                raise ImportError("Celery app not found")
+        
+        if celery_app is None:
+            raise ImportError("Celery app is None")
         
         @celery_app.task(name='agent_traffic.check_limits')
         def check_agent_traffic_limits_task():
@@ -28,17 +42,28 @@ def setup_periodic_checker(app: Flask):
         # Schedule periodic task (every 5 minutes)
         from celery.schedules import crontab
         
-        celery_app.conf.beat_schedule.update({
-            'check-agent-traffic-limits': {
-                'task': 'agent_traffic.check_limits',
-                'schedule': crontab(minute='*/5'),  # Every 5 minutes
-            },
-        })
+        # Use add_periodic_task if available (preferred method)
+        if hasattr(celery_app, 'add_periodic_task'):
+            celery_app.add_periodic_task(
+                crontab(minute='*/5'),
+                check_agent_traffic_limits_task.s(),
+                name='check-agent-traffic-limits'
+            )
+        else:
+            # Fallback to beat_schedule
+            if not hasattr(celery_app.conf, 'beat_schedule'):
+                celery_app.conf.beat_schedule = {}
+            celery_app.conf.beat_schedule.update({
+                'check-agent-traffic-limits': {
+                    'task': 'agent_traffic.check_limits',
+                    'schedule': crontab(minute='*/5'),  # Every 5 minutes
+                },
+            })
         
         logger.success("Periodic agent traffic checker setup completed")
         
-    except ImportError:
-        logger.warning("Celery not available, periodic checker will not run")
+    except ImportError as e:
+        logger.warning(f"Celery not available, periodic checker will not run: {e}")
     except Exception as e:
         logger.error(f"Error setting up periodic checker: {e}")
 
