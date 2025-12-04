@@ -37,9 +37,19 @@ if [ ! -d "$VENV_DIR" ]; then
     exit 1
 fi
 
+# Check for pip - try different locations
 if [ ! -f "$PIP_CMD" ]; then
-    echo -e "${RED}Error: pip not found in virtual environment${NC}"
-    exit 1
+    echo -e "${YELLOW}pip not found at $PIP_CMD, trying alternative locations...${NC}"
+    
+    # Try to find pip in venv
+    PIP_CMD=$(find "$VENV_DIR" -name "pip" -type f 2>/dev/null | head -n1)
+    
+    if [ -z "$PIP_CMD" ] || [ ! -f "$PIP_CMD" ]; then
+        echo -e "${YELLOW}pip executable not found, will use python -m pip${NC}"
+        PIP_CMD="$PYTHON_CMD -m pip"
+    else
+        echo -e "${GREEN}Found pip at: $PIP_CMD${NC}"
+    fi
 fi
 
 echo -e "${GREEN}✓ Prerequisites check passed${NC}"
@@ -66,11 +76,22 @@ echo ""
 # Step 3: Install module
 echo -e "${BLUE}Step 3: Installing module...${NC}"
 
-if $PIP_CMD install -e .; then
+# Check if PIP_CMD is a file or a command
+if [[ "$PIP_CMD" == *"-m pip"* ]]; then
+    # It's python -m pip
+    INSTALL_CMD="$PIP_CMD install -e ."
+else
+    # It's pip executable
+    INSTALL_CMD="$PIP_CMD install -e ."
+fi
+
+echo -e "${YELLOW}Using: $INSTALL_CMD${NC}"
+
+if eval "$INSTALL_CMD"; then
     echo -e "${GREEN}✓ Module installed successfully${NC}"
 else
-    echo -e "${YELLOW}Trying alternative method...${NC}"
-    if $PYTHON_CMD -m pip install -e .; then
+    echo -e "${YELLOW}Trying alternative method (python -m pip)...${NC}"
+    if $PYTHON_CMD -m pip install -e . 2>&1; then
         echo -e "${GREEN}✓ Module installed successfully (alternative method)${NC}"
     else
         echo -e "${RED}✗ Installation failed!${NC}"
