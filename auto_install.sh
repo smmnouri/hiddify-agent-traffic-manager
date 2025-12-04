@@ -180,7 +180,7 @@ if [ "$goto_manual_copy" = "true" ]; then
     
     echo -e "${GREEN}Found site-packages at: $SITE_PACKAGES${NC}"
     
-    # Copy module - we need to create the package directory structure
+    # Manual copy - create proper package structure
     MODULE_PACKAGE_NAME="hiddify_agent_traffic_manager"
     MODULE_SRC_DIR="$MODULE_DIR"
     
@@ -190,22 +190,33 @@ if [ "$goto_manual_copy" = "true" ]; then
     PACKAGE_DIR="$SITE_PACKAGES/$MODULE_PACKAGE_NAME"
     mkdir -p "$PACKAGE_DIR"
     
-    # Copy all Python files and directories
-    echo -e "${GREEN}Copying files...${NC}"
+    echo -e "${GREEN}Copying files to $PACKAGE_DIR...${NC}"
     
-    # Copy main files
-    for file in __init__.py models utils tasks admin api; do
-        if [ -e "$MODULE_SRC_DIR/$file" ]; then
-            cp -r "$MODULE_SRC_DIR/$file" "$PACKAGE_DIR/" 2>&1 || {
-                echo -e "${YELLOW}Warning: Could not copy $file${NC}"
+    # Copy __init__.py first
+    if [ -f "$MODULE_SRC_DIR/__init__.py" ]; then
+        cp "$MODULE_SRC_DIR/__init__.py" "$PACKAGE_DIR/" || {
+            echo -e "${RED}Failed to copy __init__.py${NC}"
+            exit 1
+        }
+    fi
+    
+    # Copy all subdirectories
+    for dir in models utils tasks admin api; do
+        if [ -d "$MODULE_SRC_DIR/$dir" ]; then
+            echo -e "${GREEN}Copying $dir...${NC}"
+            cp -r "$MODULE_SRC_DIR/$dir" "$PACKAGE_DIR/" || {
+                echo -e "${YELLOW}Warning: Could not copy $dir${NC}"
             }
         fi
     done
     
-    # Also copy any .py files in root
-    find "$MODULE_SRC_DIR" -maxdepth 1 -name "*.py" -exec cp {} "$PACKAGE_DIR/" \; 2>/dev/null || true
-    
-    echo -e "${GREEN}✓ Module copied successfully to $PACKAGE_DIR${NC}"
+    # Verify installation
+    if [ -f "$PACKAGE_DIR/__init__.py" ]; then
+        echo -e "${GREEN}✓ Module copied successfully to $PACKAGE_DIR${NC}"
+    else
+        echo -e "${RED}✗ Module copy verification failed${NC}"
+        exit 1
+    fi
 fi
 
 echo ""
