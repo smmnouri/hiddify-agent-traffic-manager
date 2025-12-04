@@ -140,7 +140,7 @@ echo "Please edit wsgi_app.py to integrate the module (see INTEGRATION.md)"
 ```bash
 cd /opt/hiddify-manager
 source .venv313/bin/activate
-pip uninstall hiddify-agent-traffic-manager -y
+/opt/hiddify-manager/.venv313/bin/pip uninstall hiddify-agent-traffic-manager -y
 rm -rf hiddify-agent-traffic-manager
 ```
 
