@@ -53,7 +53,7 @@ if [ -d "$CUSTOM_REPO_DIR" ]; then
 else
     echo -e "${GREEN}Cloning custom repository...${NC}"
     cd "$HIDDIFY_DIR"
-    git clone "$REPO_URL" hiddify-panel-custom || {
+    if ! git clone "$REPO_URL" hiddify-panel-custom 2>/dev/null; then
         echo -e "${RED}✗ Failed to clone repository${NC}"
         echo -e "${YELLOW}Creating repository with patches...${NC}"
         
@@ -63,14 +63,14 @@ else
         
         # Download and apply patches
         echo -e "${BLUE}Applying agent traffic management patches...${NC}"
-        curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh | bash || {
+        if ! curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh | bash; then
             echo -e "${YELLOW}Could not apply patches automatically${NC}"
             echo -e "${YELLOW}Please run setup_custom_repo.sh manually${NC}"
-        }
+        fi
         
         # Set remote
         git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
-    }
+    fi
 fi
 
 echo -e "${GREEN}✓ Repository ready${NC}"
