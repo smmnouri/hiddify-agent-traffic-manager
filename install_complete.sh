@@ -371,9 +371,25 @@ if 'extensions.extend([' in content and '"hiddify_agent_traffic_manager:init_app
     lines = content.split('\n')
     for i, line in enumerate(lines):
         if 'extensions.extend([' in line:
-            # Add to the next line
+            # Find the closing bracket of this extend call
+            # Look for the next line that has the same or less indent and contains ']'
             indent = len(line) - len(line.lstrip())
-            lines.insert(i + 1, ' ' * indent + '"hiddify_agent_traffic_manager:init_app",')
+            # Find where to insert (before the closing bracket)
+            insert_pos = i + 1
+            for j in range(i + 1, min(i + 20, len(lines))):  # Look at most 20 lines ahead
+                current_line = lines[j]
+                current_indent = len(current_line) - len(current_line.lstrip())
+                # If we find a line with same indent and ], insert before it
+                if current_indent == indent and '])' in current_line:
+                    insert_pos = j
+                    break
+                # If we find a line with less indent, we're past the extend block
+                if current_line.strip() and current_indent < indent:
+                    insert_pos = j
+                    break
+            
+            # Insert the extension
+            lines.insert(insert_pos, ' ' * (indent + 4) + '"hiddify_agent_traffic_manager:init_app",')
             content = '\n'.join(lines)
             print("Added to extensions.extend")
             break
