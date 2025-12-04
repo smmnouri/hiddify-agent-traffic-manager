@@ -42,13 +42,38 @@ if [ ! -f "$PIP_CMD" ]; then
     echo -e "${YELLOW}pip not found at $PIP_CMD, trying alternative locations...${NC}"
     
     # Try to find pip in venv
-    PIP_CMD=$(find "$VENV_DIR" -name "pip" -type f 2>/dev/null | head -n1)
+    FOUND_PIP=$(find "$VENV_DIR" -name "pip" -type f 2>/dev/null | head -n1)
     
-    if [ -z "$PIP_CMD" ] || [ ! -f "$PIP_CMD" ]; then
-        echo -e "${YELLOW}pip executable not found, will use python -m pip${NC}"
-        PIP_CMD="$PYTHON_CMD -m pip"
-    else
+    if [ -n "$FOUND_PIP" ] && [ -f "$FOUND_PIP" ]; then
+        PIP_CMD="$FOUND_PIP"
         echo -e "${GREEN}Found pip at: $PIP_CMD${NC}"
+    else
+        # Check if python exists and can run -m pip
+        if [ -f "$PYTHON_CMD" ] && $PYTHON_CMD -m pip --version >/dev/null 2>&1; then
+            echo -e "${GREEN}Using: $PYTHON_CMD -m pip${NC}"
+            PIP_CMD="$PYTHON_CMD -m pip"
+        else
+            echo -e "${YELLOW}pip executable not found, will use python -m pip${NC}"
+            PIP_CMD="$PYTHON_CMD -m pip"
+        fi
+    fi
+fi
+
+# Verify pip works
+echo -e "${GREEN}Verifying pip...${NC}"
+if [[ "$PIP_CMD" == *"-m pip"* ]]; then
+    if $PYTHON_CMD -m pip --version >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Pip is working (python -m pip)${NC}"
+    else
+        echo -e "${RED}Pip verification failed${NC}"
+        exit 1
+    fi
+else
+    if $PIP_CMD --version >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Pip is working${NC}"
+    else
+        echo -e "${RED}Pip verification failed${NC}"
+        exit 1
     fi
 fi
 
