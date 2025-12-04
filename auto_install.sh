@@ -108,125 +108,147 @@ fi
 
 echo ""
 
-# Step 5: Find and edit wsgi_app.py
+# Step 5: Find and edit base.py for integration
 echo -e "${BLUE}Step 5: Integrating with HiddifyPanel...${NC}"
 
-# Find wsgi_app.py
-WSGI_APP_PATHS=(
-    "$VENV_DIR/lib/python3.13/site-packages/hiddifypanel/apps/wsgi_app.py"
-    "$VENV_DIR/lib/python3.12/site-packages/hiddifypanel/apps/wsgi_app.py"
-    "$VENV_DIR/lib/python3.11/site-packages/hiddifypanel/apps/wsgi_app.py"
-    "$HIDDIFY_DIR/hiddify-panel/src/hiddifypanel/apps/wsgi_app.py"
+# Find base.py (where create_app is defined)
+BASE_PY_PATHS=(
+    "$VENV_DIR/lib/python3.13/site-packages/hiddifypanel/base.py"
+    "$VENV_DIR/lib/python3.12/site-packages/hiddifypanel/base.py"
+    "$VENV_DIR/lib/python3.11/site-packages/hiddifypanel/base.py"
+    "$HIDDIFY_DIR/hiddify-panel/src/hiddifypanel/base.py"
 )
 
-WSGI_APP_FILE=""
+BASE_PY_FILE=""
 
-for path in "${WSGI_APP_PATHS[@]}"; do
+for path in "${BASE_PY_PATHS[@]}"; do
     if [ -f "$path" ]; then
-        WSGI_APP_FILE="$path"
-        echo -e "${GREEN}Found wsgi_app.py at: $path${NC}"
+        BASE_PY_FILE="$path"
+        echo -e "${GREEN}Found base.py at: $path${NC}"
         break
     fi
 done
 
-if [ -z "$WSGI_APP_FILE" ]; then
-    echo -e "${YELLOW}wsgi_app.py not found in common locations. Searching...${NC}"
-    WSGI_APP_FILE=$(find "$VENV_DIR" -name "wsgi_app.py" -type f 2>/dev/null | head -n1)
+if [ -z "$BASE_PY_FILE" ]; then
+    echo -e "${YELLOW}base.py not found in common locations. Searching...${NC}"
+    BASE_PY_FILE=$(find "$VENV_DIR" -name "base.py" -path "*/hiddifypanel/base.py" -type f 2>/dev/null | head -n1)
     
-    if [ -z "$WSGI_APP_FILE" ]; then
-        WSGI_APP_FILE=$(find "$HIDDIFY_DIR" -name "wsgi_app.py" -type f 2>/dev/null | head -n1)
+    if [ -z "$BASE_PY_FILE" ]; then
+        BASE_PY_FILE=$(find "$HIDDIFY_DIR" -name "base.py" -path "*/hiddifypanel/base.py" -type f 2>/dev/null | head -n1)
     fi
 fi
 
-if [ -z "$WSGI_APP_FILE" ] || [ ! -f "$WSGI_APP_FILE" ]; then
-    echo -e "${RED}✗ Could not find wsgi_app.py${NC}"
-    echo -e "${YELLOW}Please manually edit wsgi_app.py and add:${NC}"
+if [ -z "$BASE_PY_FILE" ] || [ ! -f "$BASE_PY_FILE" ]; then
+    echo -e "${RED}✗ Could not find base.py${NC}"
+    echo -e "${YELLOW}Please manually edit base.py and add in create_app function:${NC}"
     echo "  from hiddify_agent_traffic_manager import init_app"
-    echo "  app = init_app(app)  # in create_app()"
+    echo "  app = init_app(app)  # before return app"
     exit 1
 fi
 
 # Backup original file
-BACKUP_FILE="${WSGI_APP_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-cp "$WSGI_APP_FILE" "$BACKUP_FILE"
+BACKUP_FILE="${BASE_PY_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
+cp "$BASE_PY_FILE" "$BACKUP_FILE"
 echo -e "${GREEN}✓ Backup created: $BACKUP_FILE${NC}"
 
 # Check if already integrated
-if grep -q "hiddify_agent_traffic_manager" "$WSGI_APP_FILE"; then
-    echo -e "${YELLOW}Module already integrated in wsgi_app.py${NC}"
+if grep -q "hiddify_agent_traffic_manager" "$BASE_PY_FILE"; then
+    echo -e "${YELLOW}Module already integrated in base.py${NC}"
     echo -e "${GREEN}✓ Integration check passed${NC}"
 else
     echo -e "${GREEN}Adding integration code...${NC}"
     
-    # Add import at the top (after other imports)
-    if ! grep -q "from hiddify_agent_traffic_manager import init_app" "$WSGI_APP_FILE"; then
-        # Find a good place to add import (after flask or hiddifypanel imports)
-        if grep -q "^from flask" "$WSGI_APP_FILE" || grep -q "^import flask" "$WSGI_APP_FILE"; then
-            # Add after flask imports
-            sed -i '/^from flask\|^import flask/a from hiddify_agent_traffic_manager import init_app' "$WSGI_APP_FILE"
-        elif grep -q "^import hiddifypanel" "$WSGI_APP_FILE" || grep -q "^from hiddifypanel" "$WSGI_APP_FILE"; then
-            # Add after hiddifypanel imports
-            sed -i '/^import hiddifypanel\|^from hiddifypanel/a from hiddify_agent_traffic_manager import init_app' "$WSGI_APP_FILE"
-        else
-            # Add at the beginning of imports section
-            sed -i '1a from hiddify_agent_traffic_manager import init_app' "$WSGI_APP_FILE"
-        fi
-        echo -e "${GREEN}✓ Import added${NC}"
-    fi
-    
-    # Add init_app call in create_app function
-    if grep -q "def create_app" "$WSGI_APP_FILE"; then
-        # Check if init_app is already called
-        if ! grep -q "init_app(app)" "$WSGI_APP_FILE"; then
-            # Find the return statement in create_app and add init_app before it
-            # This is a bit tricky, so we'll use a Python script for safety
-            $PYTHON_CMD << 'PYTHON_SCRIPT'
-import re
+    # Use Python script for safe integration
+    $PYTHON_CMD << 'PYTHON_SCRIPT'
 import sys
+import re
 
 file_path = sys.argv[1]
 
-with open(file_path, 'r') as f:
+with open(file_path, 'r', encoding='utf-8') as f:
     content = f.read()
 
 # Check if already integrated
-if 'init_app(app)' in content:
+if 'hiddify_agent_traffic_manager' in content:
     print("Already integrated")
     sys.exit(0)
 
-# Find create_app function and add init_app before return
-pattern = r'(def create_app\([^)]*\):.*?)(\n\s+return\s+app)'
-replacement = r'\1\n    # Initialize agent traffic manager\n    app = init_app(app)\2'
+# Add import after other imports
+import_added = False
+if 'from hiddify_agent_traffic_manager import init_app' not in content:
+    # Find a good place to add import (after dynaconf or dotenv)
+    if 'from dynaconf import' in content:
+        content = content.replace(
+            'from dynaconf import FlaskDynaconf',
+            'from dynaconf import FlaskDynaconf\nfrom hiddify_agent_traffic_manager import init_app'
+        )
+        import_added = True
+    elif 'from dotenv import' in content:
+        content = content.replace(
+            'from dotenv import dotenv_values',
+            'from dotenv import dotenv_values\nfrom hiddify_agent_traffic_manager import init_app'
+        )
+        import_added = True
+    else:
+        # Add after imports section
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if line.startswith('def create_app'):
+                # Add import before function
+                lines.insert(i, 'from hiddify_agent_traffic_manager import init_app')
+                import_added = True
+                break
+        if import_added:
+            content = '\n'.join(lines)
 
-new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-
-if new_content != content:
-    with open(file_path, 'w') as f:
-        f.write(new_content)
-    print("Integration added successfully")
-else:
-    # Fallback: add before last return
-    lines = content.split('\n')
-    for i in range(len(lines) - 1, -1, -1):
-        if 'return app' in lines[i] and 'def create_app' in '\n'.join(lines[:i]):
-            indent = len(lines[i]) - len(lines[i].lstrip())
-            lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
-            lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
-            break
+# Add init_app call in create_app function before return
+if 'app = init_app(app)' not in content and 'def create_app' in content:
+    # Find the return statement in create_app
+    pattern = r'(def create_app\([^)]*\):.*?)(\n\s+app\.config\.load_extensions\("EXTENSIONS"\)\s*\n\s+return\s+app)'
     
-    with open(file_path, 'w') as f:
-        f.write('\n'.join(lines))
-    print("Integration added (fallback method)")
+    def replace_func(match):
+        before = match.group(1)
+        after = match.group(2)
+        # Add init_app before return
+        return before + '\n    # Initialize agent traffic manager\n    app = init_app(app)' + after
+    
+    new_content = re.sub(pattern, replace_func, content, flags=re.DOTALL)
+    
+    if new_content == content:
+        # Fallback: add before return app
+        lines = content.split('\n')
+        for i in range(len(lines) - 1, -1, -1):
+            if 'return app' in lines[i] and i > 0:
+                # Check if we're in create_app function
+                func_start = -1
+                for j in range(i, -1, -1):
+                    if 'def create_app' in lines[j]:
+                        func_start = j
+                        break
+                
+                if func_start >= 0:
+                    indent = len(lines[i]) - len(lines[i].lstrip())
+                    lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
+                    lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
+                    new_content = '\n'.join(lines)
+                    break
+    
+    content = new_content
+
+# Write back
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+if import_added:
+    print("Import added")
+if 'app = init_app(app)' in content:
+    print("Integration code added")
+else:
+    print("Warning: Could not add integration code automatically")
 PYTHON_SCRIPT
-            "$WSGI_APP_FILE"
-            
-            echo -e "${GREEN}✓ Integration code added${NC}"
-        else
-            echo -e "${GREEN}✓ Integration already present${NC}"
-        fi
-    else
-        echo -e "${YELLOW}Warning: create_app function not found. Manual integration required.${NC}"
-    fi
+    "$BASE_PY_FILE"
+    
+    echo -e "${GREEN}✓ Integration code added${NC}"
 fi
 
 echo ""
