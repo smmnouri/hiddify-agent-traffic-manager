@@ -249,93 +249,88 @@ else
         echo -e "${GREEN}Adding integration code...${NC}"
         
         # Use Python script for safe integration
-        $PYTHON_CMD << 'PYTHON_SCRIPT'
+        $PYTHON_CMD << PYTHON_SCRIPT
 import sys
 import re
 
-file_path = sys.argv[1]
+file_path = "$BASE_PY_FILE"
 
-with open(file_path, 'r', encoding='utf-8') as f:
-    content = f.read()
+try:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+except Exception as e:
+    print(f"Error reading file: {e}")
+    sys.exit(1)
 
 # Check if already integrated
-if 'hiddify_agent_traffic_manager' in content:
+if 'hiddify_agent_traffic_manager' in content and ('init_app(app)' in content or '"hiddify_agent_traffic_manager:init_app"' in content):
     print("Already integrated")
     sys.exit(0)
 
 # Add import after dynaconf or dotenv
 import_added = False
-if 'from dynaconf import' in content:
+if 'from dynaconf import' in content and 'from hiddify_agent_traffic_manager import init_app' not in content:
     content = content.replace(
         'from dynaconf import FlaskDynaconf',
-        'from dynaconf import FlaskDynaconf\nfrom hiddify_agent_traffic_manager import init_app'
+        'from dynaconf import FlaskDynaconf\\nfrom hiddify_agent_traffic_manager import init_app'
     )
     import_added = True
-elif 'from dotenv import' in content:
+    print("Import added after dynaconf")
+elif 'from dotenv import' in content and 'from hiddify_agent_traffic_manager import init_app' not in content:
     content = content.replace(
         'from dotenv import dotenv_values',
-        'from dotenv import dotenv_values\nfrom hiddify_agent_traffic_manager import init_app'
+        'from dotenv import dotenv_values\\nfrom hiddify_agent_traffic_manager import init_app'
     )
     import_added = True
-else:
+    print("Import added after dotenv")
+elif 'from hiddify_agent_traffic_manager import init_app' not in content:
     # Add before create_app function
-    lines = content.split('\n')
+    lines = content.split('\\n')
     for i, line in enumerate(lines):
         if line.startswith('def create_app'):
             lines.insert(i, 'from hiddify_agent_traffic_manager import init_app')
             import_added = True
+            content = '\\n'.join(lines)
+            print("Import added before create_app")
             break
-    if import_added:
-        content = '\n'.join(lines)
 
 # Add to extensions list (preferred method for HiddifyPanel)
-if 'hiddify_agent_traffic_manager' not in content and 'extensions.extend([' in content:
-    # Add to the extend list
-    content = content.replace(
-        'extensions.extend([',
-        'extensions.extend([\n            "hiddify_agent_traffic_manager:init_app",'
-    )
-    print("Added to extensions.extend")
+if 'extensions.extend([' in content and '"hiddify_agent_traffic_manager:init_app"' not in content:
+    # Find the line with extensions.extend([
+    lines = content.split('\\n')
+    for i, line in enumerate(lines):
+        if 'extensions.extend([' in line:
+            # Add to the next line
+            indent = len(line) - len(line.lstrip())
+            lines.insert(i + 1, ' ' * indent + '"hiddify_agent_traffic_manager:init_app",')
+            content = '\\n'.join(lines)
+            print("Added to extensions.extend")
+            break
 elif 'app = init_app(app)' not in content and 'def create_app' in content:
     # Fallback: add init_app call before return
-    pattern = r'(def create_app\([^)]*\):.*?)(\n\s+app\.config\.load_extensions\("EXTENSIONS"\)\s*\n\s+return\s+app)'
-    
-    def replace_func(match):
-        before = match.group(1)
-        after = match.group(2)
-        return before + '\n    # Initialize agent traffic manager\n    app = init_app(app)' + after
-    
-    new_content = re.sub(pattern, replace_func, content, flags=re.DOTALL)
-    if new_content != content:
-        content = new_content
-        print("Added init_app call before return")
-    else:
-        # Fallback: add before return app
-        lines = content.split('\n')
-        for i in range(len(lines) - 1, -1, -1):
-            if 'return app' in lines[i] and i > 0:
-                func_start = -1
-                for j in range(i, -1, -1):
-                    if 'def create_app' in lines[j]:
-                        func_start = j
-                        break
-                
-                if func_start >= 0:
-                    indent = len(lines[i]) - len(lines[i].lstrip())
-                    lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
-                    lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
-                    content = '\n'.join(lines)
-                    print("Added init_app call (fallback)")
-                    break
+    # Find return app in create_app function
+    lines = content.split('\\n')
+    in_create_app = False
+    for i in range(len(lines) - 1, -1, -1):
+        if 'return app' in lines[i] and in_create_app:
+            indent = len(lines[i]) - len(lines[i].lstrip())
+            lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
+            lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
+            content = '\\n'.join(lines)
+            print("Added init_app call before return")
+            break
+        elif 'def create_app' in lines[i]:
+            in_create_app = True
 
 # Write back
-with open(file_path, 'w', encoding='utf-8') as f:
-    f.write(content)
-
-if import_added:
-    print("Import added")
+try:
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print("File updated successfully")
+except Exception as e:
+    print(f"Error writing file: {e}")
+    sys.exit(1)
 PYTHON_SCRIPT
-        "$BASE_PY_FILE"
         
         echo -e "${GREEN}✓ Integration code added${NC}"
     fi
