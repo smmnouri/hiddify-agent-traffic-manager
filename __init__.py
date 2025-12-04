@@ -31,18 +31,54 @@ def init_app(app):
     from .api.agent_traffic_api import agent_traffic_bp
     app.register_blueprint(agent_traffic_bp, url_prefix='/api/v1/agent-traffic')
     
-    # Extend admin interface (optional)
+    # Extend admin interface
     try:
         from .admin.agent_traffic_admin import extend_admin_user_view, add_traffic_management_view
-        from flask_admin import Admin
+        from hiddifypanel import Events
+        from loguru import logger
         
-        # Try to get admin instance
-        admin = getattr(app, 'admin', None)
-        if admin:
-            add_traffic_management_view(admin, app)
+        def extend_admin_views(flaskadmin=None, admin_bp=None):
+            """Extend admin views using HiddifyPanel's event system"""
+            try:
+                # Import AdminstratorAdmin
+                from hiddifypanel.panel.admin.AdminstratorAdmin import AdminstratorAdmin
+                
+                # Extend the AdminstratorAdmin class
+                extended_class = extend_admin_user_view(AdminstratorAdmin)
+                
+                # Replace the original class with extended one
+                import hiddifypanel.panel.admin.AdminstratorAdmin as admin_module
+                admin_module.AdminstratorAdmin = extended_class
+                
+                logger.success("Extended AdminstratorAdmin with traffic management")
+                
+                # Add traffic management view if admin instance is available
+                if flaskadmin:
+                    add_traffic_management_view(flaskadmin, app)
+                    logger.success("Added traffic management view to admin")
+                    
+            except Exception as e:
+                logger.error(f"Error extending admin views: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+        
+        # Register with HiddifyPanel's event system
+        Events.admin_prehook.subscribe(extend_admin_views)
+        logger.success("Registered admin_prehook for traffic management")
+        
+        # Also try to extend immediately if admin is already initialized
+        try:
+            from hiddifypanel.panel.admin import flaskadmin
+            if flaskadmin:
+                extend_admin_views(flaskadmin=flaskadmin)
+        except:
+            pass  # Admin not initialized yet, will be called via event
+            
     except Exception as e:
         from loguru import logger
         logger.warning(f"Could not extend admin interface: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
     
     return app
 

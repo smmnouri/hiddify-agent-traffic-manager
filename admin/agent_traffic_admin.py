@@ -20,13 +20,20 @@ def extend_admin_user_view(admin_view):
     if original_form_columns:
         if 'traffic_limit_GB' not in original_form_columns:
             admin_view.form_columns = list(original_form_columns) + ['traffic_limit_GB']
+    else:
+        admin_view.form_columns = ['traffic_limit_GB']
     
-    # Add traffic limit to column list
+    # Add traffic limit and traffic info to column list
     original_column_list = admin_view.column_list
     
     if original_column_list:
-        if 'traffic_limit_GB' not in original_column_list:
-            admin_view.column_list = list(original_column_list) + ['traffic_limit_GB']
+        # Add traffic columns if not already present
+        traffic_columns = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
+        for col in traffic_columns:
+            if col not in original_column_list:
+                admin_view.column_list = list(original_column_list) + [col]
+    else:
+        admin_view.column_list = ['traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status']
     
     # Add custom column formatters
     def _format_traffic_limit(view, context, model, name):
