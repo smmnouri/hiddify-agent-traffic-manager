@@ -46,16 +46,12 @@ def setup_user_creation_hook():
         can_create, error_msg = agent.can_create_user_with_traffic(user_traffic_limit_GB)
         
         if not can_create:
+            error_message = error_msg or _("Cannot create user due to traffic limit")
             logger.error(
                 f"User creation blocked for agent {agent.name} (ID: {agent_id}). "
-                f"Reason: {error_msg}"
+                f"Reason: {error_message}"
             )
-            from sqlalchemy.exc import IntegrityError
-            raise IntegrityError(
-                statement=None,
-                params=None,
-                orig=ValueError(error_msg or _("Cannot create user due to traffic limit"))
-            )
+            raise ValueError(error_message)
     
     @event.listens_for(User, 'before_update', propagate=True)
     def check_traffic_before_user_update(mapper, connection, target):
@@ -113,16 +109,12 @@ def setup_user_creation_hook():
         agent_limit = int(agent.traffic_limit_GB * (1024**3))
         
         if new_total > agent_limit:
+            error_message = _("Updating user traffic limit would exceed agent's traffic limit")
             logger.error(
                 f"User update blocked for agent {agent.name} (ID: {agent_id}). "
                 f"New total would exceed limit: {new_total/(1024**3):.2f} GB > {agent.traffic_limit_GB} GB"
             )
-            from sqlalchemy.exc import IntegrityError
-            raise IntegrityError(
-                statement=None,
-                params=None,
-                orig=ValueError(_("Updating user traffic limit would exceed agent's traffic limit"))
-            )
+            raise ValueError(error_message)
 
 
 def init_user_creation_hook():
