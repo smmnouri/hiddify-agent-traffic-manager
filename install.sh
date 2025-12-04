@@ -74,8 +74,13 @@ fi
 if ! cd "$HIDDIFY_DIR" 2>/dev/null; then
     echo -e "${RED}✗ Cannot access Hiddify-Manager directory: $HIDDIFY_DIR${NC}"
     echo -e "${YELLOW}Please check permissions and try again${NC}"
+    echo -e "${YELLOW}Current directory: $(pwd)${NC}"
+    echo -e "${YELLOW}Directory exists: $([ -d "$HIDDIFY_DIR" ] && echo 'yes' || echo 'no')${NC}"
     exit 1
 fi
+
+# Return to original directory for safety
+cd - > /dev/null 2>&1 || true
 
 echo -e "${GREEN}✓ Hiddify-Manager found at $HIDDIFY_DIR${NC}"
 echo ""
@@ -92,7 +97,7 @@ if [ -d "$CUSTOM_REPO_DIR" ]; then
     git pull origin main || git pull origin master || echo "Could not pull"
 else
     echo -e "${GREEN}Cloning custom repository...${NC}"
-    # Verify directory exists before cd
+    # Verify directory exists before cd - double check
     if [ ! -d "$HIDDIFY_DIR" ]; then
         echo -e "${RED}✗ Hiddify-Manager directory not found: $HIDDIFY_DIR${NC}"
         echo -e "${YELLOW}Please install Hiddify-Manager first:${NC}"
@@ -100,9 +105,11 @@ else
         exit 1
     fi
     
-    # Change to directory with error handling
-    if ! cd "$HIDDIFY_DIR"; then
+    # Change to directory with error handling - use absolute path
+    if ! cd "$HIDDIFY_DIR" 2>&1; then
         echo -e "${RED}✗ Cannot access $HIDDIFY_DIR${NC}"
+        echo -e "${YELLOW}Current directory: $(pwd)${NC}"
+        echo -e "${YELLOW}Directory exists: $([ -d "$HIDDIFY_DIR" ] && echo 'yes' || echo 'no')${NC}"
         echo -e "${YELLOW}Please check permissions${NC}"
         exit 1
     fi
