@@ -248,12 +248,13 @@ else
     else
         echo -e "${GREEN}Adding integration code...${NC}"
         
-        # Use Python script for safe integration
-        $PYTHON_CMD << PYTHON_SCRIPT
+        # Create temporary Python script for safe integration
+        TEMP_PY_SCRIPT=$(mktemp /tmp/integrate_agent_traffic.XXXXXX.py)
+        cat > "$TEMP_PY_SCRIPT" << 'PYTHON_SCRIPT_EOF'
 import sys
 import re
 
-file_path = "$BASE_PY_FILE"
+file_path = sys.argv[1]
 
 try:
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -272,51 +273,51 @@ import_added = False
 if 'from dynaconf import' in content and 'from hiddify_agent_traffic_manager import init_app' not in content:
     content = content.replace(
         'from dynaconf import FlaskDynaconf',
-        'from dynaconf import FlaskDynaconf\\nfrom hiddify_agent_traffic_manager import init_app'
+        'from dynaconf import FlaskDynaconf\nfrom hiddify_agent_traffic_manager import init_app'
     )
     import_added = True
     print("Import added after dynaconf")
 elif 'from dotenv import' in content and 'from hiddify_agent_traffic_manager import init_app' not in content:
     content = content.replace(
         'from dotenv import dotenv_values',
-        'from dotenv import dotenv_values\\nfrom hiddify_agent_traffic_manager import init_app'
+        'from dotenv import dotenv_values\nfrom hiddify_agent_traffic_manager import init_app'
     )
     import_added = True
     print("Import added after dotenv")
 elif 'from hiddify_agent_traffic_manager import init_app' not in content:
     # Add before create_app function
-    lines = content.split('\\n')
+    lines = content.split('\n')
     for i, line in enumerate(lines):
         if line.startswith('def create_app'):
             lines.insert(i, 'from hiddify_agent_traffic_manager import init_app')
             import_added = True
-            content = '\\n'.join(lines)
+            content = '\n'.join(lines)
             print("Import added before create_app")
             break
 
 # Add to extensions list (preferred method for HiddifyPanel)
 if 'extensions.extend([' in content and '"hiddify_agent_traffic_manager:init_app"' not in content:
     # Find the line with extensions.extend([
-    lines = content.split('\\n')
+    lines = content.split('\n')
     for i, line in enumerate(lines):
         if 'extensions.extend([' in line:
             # Add to the next line
             indent = len(line) - len(line.lstrip())
             lines.insert(i + 1, ' ' * indent + '"hiddify_agent_traffic_manager:init_app",')
-            content = '\\n'.join(lines)
+            content = '\n'.join(lines)
             print("Added to extensions.extend")
             break
 elif 'app = init_app(app)' not in content and 'def create_app' in content:
     # Fallback: add init_app call before return
     # Find return app in create_app function
-    lines = content.split('\\n')
+    lines = content.split('\n')
     in_create_app = False
     for i in range(len(lines) - 1, -1, -1):
         if 'return app' in lines[i] and in_create_app:
             indent = len(lines[i]) - len(lines[i].lstrip())
             lines.insert(i, ' ' * indent + '# Initialize agent traffic manager')
             lines.insert(i + 1, ' ' * indent + 'app = init_app(app)')
-            content = '\\n'.join(lines)
+            content = '\n'.join(lines)
             print("Added init_app call before return")
             break
         elif 'def create_app' in lines[i]:
@@ -330,9 +331,20 @@ try:
 except Exception as e:
     print(f"Error writing file: {e}")
     sys.exit(1)
-PYTHON_SCRIPT
+PYTHON_SCRIPT_EOF
         
-        echo -e "${GREEN}✓ Integration code added${NC}"
+        # Execute the Python script
+        if $PYTHON_CMD "$TEMP_PY_SCRIPT" "$BASE_PY_FILE"; then
+            echo -e "${GREEN}✓ Integration code added${NC}"
+        else
+            echo -e "${RED}✗ Integration failed${NC}"
+            echo -e "${YELLOW}Please manually edit base.py and add:${NC}"
+            echo "  from hiddify_agent_traffic_manager import init_app"
+            echo "  app = init_app(app)  # in create_app function"
+        fi
+        
+        # Clean up
+        rm -f "$TEMP_PY_SCRIPT"
     fi
 fi
 
