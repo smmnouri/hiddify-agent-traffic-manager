@@ -35,9 +35,28 @@ if [ ! -d "$HIDDIFY_DIR" ]; then
         echo -e "${RED}✗ Failed to install Hiddify-Manager${NC}"
         exit 1
     }
+    
+    # Wait a bit and verify installation
+    sleep 2
+    if [ ! -d "$HIDDIFY_DIR" ]; then
+        echo -e "${YELLOW}Waiting for Hiddify-Manager installation to complete...${NC}"
+        for i in {1..10}; do
+            sleep 2
+            if [ -d "$HIDDIFY_DIR" ]; then
+                break
+            fi
+            echo -e "${YELLOW}Still waiting... ($i/10)${NC}"
+        done
+    fi
+    
+    if [ ! -d "$HIDDIFY_DIR" ]; then
+        echo -e "${RED}✗ Hiddify-Manager directory not found after installation${NC}"
+        echo -e "${YELLOW}Please install Hiddify-Manager manually first${NC}"
+        exit 1
+    fi
 fi
 
-echo -e "${GREEN}✓ Hiddify-Manager found${NC}"
+echo -e "${GREEN}✓ Hiddify-Manager found at $HIDDIFY_DIR${NC}"
 echo ""
 
 # Step 3: Setup custom repository
@@ -52,7 +71,14 @@ if [ -d "$CUSTOM_REPO_DIR" ]; then
     git pull origin main || git pull origin master || echo "Could not pull"
 else
     echo -e "${GREEN}Cloning custom repository...${NC}"
-    cd "$HIDDIFY_DIR"
+    if [ ! -d "$HIDDIFY_DIR" ]; then
+        echo -e "${RED}✗ Hiddify-Manager directory not found: $HIDDIFY_DIR${NC}"
+        exit 1
+    fi
+    cd "$HIDDIFY_DIR" || {
+        echo -e "${RED}✗ Cannot access $HIDDIFY_DIR${NC}"
+        exit 1
+    }
     if ! git clone "$REPO_URL" hiddify-panel-custom 2>/dev/null; then
         echo -e "${RED}✗ Failed to clone repository${NC}"
         echo -e "${YELLOW}Creating repository with patches...${NC}"
