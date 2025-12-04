@@ -13,8 +13,9 @@ setup(
     description="ماژول مدیریت محدودیت ترافیک برای ایجنت‌ها در HiddifyPanel",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/hiddify/agent-traffic-manager",
-    packages=find_packages(),
+    url="https://github.com/smmnouri/hiddify-agent-traffic-manager",
+    packages=find_packages(exclude=['tests', '*.tests', '*.tests.*', 'tests.*']),
+    package_dir={'': '.'},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
