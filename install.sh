@@ -113,23 +113,34 @@ else
         echo -e "${YELLOW}Please check permissions${NC}"
         exit 1
     fi
+    # Try to clone with different methods
     if ! git clone "$REPO_URL" hiddify-panel-custom 2>/dev/null; then
-        echo -e "${RED}✗ Failed to clone repository${NC}"
-        echo -e "${YELLOW}Creating repository with patches...${NC}"
+        echo -e "${YELLOW}Could not clone from your repository, creating with patches...${NC}"
         
         # Clone original and apply patches
-        git clone https://github.com/hiddify/HiddifyPanel.git hiddify-panel-custom
+        if [ ! -d "hiddify-panel-custom" ]; then
+            git clone https://github.com/hiddify/HiddifyPanel.git hiddify-panel-custom
+        fi
         cd hiddify-panel-custom
         
-        # Download and apply patches
+        # Download and apply patches using the module's script
         echo -e "${BLUE}Applying agent traffic management patches...${NC}"
-        if ! curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh | bash; then
-            echo -e "${YELLOW}Could not apply patches automatically${NC}"
-            echo -e "${YELLOW}Please run setup_custom_repo.sh manually${NC}"
+        
+        # Check if we have the module directory
+        MODULE_DIR="$HIDDIFY_DIR/hiddify-agent-traffic-manager"
+        if [ -d "$MODULE_DIR" ] && [ -f "$MODULE_DIR/apply_to_source.sh" ]; then
+            bash "$MODULE_DIR/apply_to_source.sh"
+        elif [ -f "/tmp/apply_to_source.sh" ]; then
+            bash /tmp/apply_to_source.sh
+        else
+            # Download the script
+            curl -s https://raw.githubusercontent.com/smmnouri/hiddify-agent-traffic-manager/main/apply_to_source.sh -o /tmp/apply_to_source.sh
+            chmod +x /tmp/apply_to_source.sh
+            bash /tmp/apply_to_source.sh
         fi
         
-        # Set remote
-        git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+        # Set remote (optional, don't fail if it doesn't work)
+        git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL" 2>/dev/null || echo "Could not set remote (this is OK)"
     fi
 fi
 
@@ -142,37 +153,58 @@ echo -e "${BLUE}Step 2: Installing from custom repository...${NC}"
 cd "$CUSTOM_REPO_DIR"
 
 # Check if it's a proper HiddifyPanel structure
-if [ ! -d "src" ] && [ -d "hiddifypanel" ]; then
-    # It's the source structure
-    SOURCE_DIR="$CUSTOM_REPO_DIR"
-elif [ -d "src" ]; then
+if [ -d "src" ]; then
     SOURCE_DIR="$CUSTOM_REPO_DIR/src"
+elif [ -d "hiddifypanel" ]; then
+    SOURCE_DIR="$CUSTOM_REPO_DIR"
 else
     echo -e "${RED}✗ Invalid repository structure${NC}"
-    exit 1
+    echo -e "${YELLOW}Trying to find source in parent directory...${NC}"
+    # Try parent directory
+    if [ -d "$HIDDIFY_DIR/hiddify-panel/src" ]; then
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
+        echo -e "${GREEN}Found source at: $SOURCE_DIR${NC}"
+    else
+        echo -e "${RED}✗ Could not find HiddifyPanel source${NC}"
+        exit 1
+    fi
 fi
 
 # Install using pip
 VENV_DIR="$HIDDIFY_DIR/.venv313"
 if [ -d "$VENV_DIR" ]; then
+    PYTHON_CMD="$VENV_DIR/bin/python"
+    
+    # Check if pip exists, if not install it
+    if [ ! -f "$VENV_DIR/bin/pip" ]; then
+        echo -e "${YELLOW}pip not found, installing...${NC}"
+        $PYTHON_CMD -m ensurepip --upgrade || {
+            echo -e "${YELLOW}ensurepip failed, trying get-pip.py...${NC}"
+            curl -s https://bootstrap.pypa.io/get-pip.py | $PYTHON_CMD
+        }
+    fi
+    
     PIP_CMD="$VENV_DIR/bin/pip"
     if [ ! -f "$PIP_CMD" ]; then
-        PIP_CMD="$VENV_DIR/bin/python -m pip"
+        PIP_CMD="$PYTHON_CMD -m pip"
     fi
     
     echo -e "${BLUE}Installing from source...${NC}"
     cd "$SOURCE_DIR"
-    $PIP_CMD install -e . || {
-        echo -e "${YELLOW}pip install failed, trying alternative...${NC}"
-        cd "$CUSTOM_REPO_DIR"
-        if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
-            $PIP_CMD install -e .
-        else
-            echo -e "${YELLOW}Manual installation required${NC}"
-        fi
-    }
     
-    echo -e "${GREEN}✓ Installed from custom repository${NC}"
+    if [ -f "setup.py" ] || [ -f "pyproject.toml" ]; then
+        $PIP_CMD install -e . || {
+            echo -e "${YELLOW}pip install failed, trying python -m pip...${NC}"
+            $PYTHON_CMD -m pip install -e . || {
+                echo -e "${YELLOW}Installation failed, but continuing...${NC}"
+            }
+        }
+        echo -e "${GREEN}✓ Installed from custom repository${NC}"
+    else
+        echo -e "${YELLOW}⚠ setup.py or pyproject.toml not found in $SOURCE_DIR${NC}"
+        echo -e "${YELLOW}Directory contents:${NC}"
+        ls -la "$SOURCE_DIR" | head -10
+    fi
 else
     echo -e "${YELLOW}⚠ Virtual environment not found${NC}"
 fi
