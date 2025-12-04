@@ -70,7 +70,7 @@ else
         
         # Set remote
         git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
-    fi
+    }
 fi
 
 echo -e "${GREEN}✓ Repository ready${NC}"
