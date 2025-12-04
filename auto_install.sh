@@ -61,12 +61,55 @@ fi
 
 # Verify pip works
 echo -e "${GREEN}Verifying pip...${NC}"
+
+# First check if python exists
+if [ ! -f "$PYTHON_CMD" ]; then
+    echo -e "${YELLOW}Python not found at $PYTHON_CMD, searching...${NC}"
+    PYTHON_CMD=$(find "$VENV_DIR" -name "python*" -type f -executable 2>/dev/null | grep -E "python3?$" | head -n1)
+    
+    if [ -z "$PYTHON_CMD" ] || [ ! -f "$PYTHON_CMD" ]; then
+        # Try system python
+        if command -v python3 >/dev/null 2>&1; then
+            PYTHON_CMD="python3"
+            echo -e "${YELLOW}Using system python3${NC}"
+        else
+            echo -e "${RED}Python not found!${NC}"
+            exit 1
+        fi
+    fi
+fi
+
+# Verify python works
+if ! $PYTHON_CMD --version >/dev/null 2>&1; then
+    echo -e "${RED}Python verification failed!${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Python found: $($PYTHON_CMD --version 2>&1)${NC}"
+
+# Now verify pip
 if [[ "$PIP_CMD" == *"-m pip"* ]]; then
     if $PYTHON_CMD -m pip --version >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Pip is working (python -m pip)${NC}"
+        PIP_CMD="$PYTHON_CMD -m pip"
     else
-        echo -e "${RED}Pip verification failed${NC}"
-        exit 1
+        echo -e "${YELLOW}Pip module not available, trying to bootstrap...${NC}"
+        # Try to bootstrap pip
+        $PYTHON_CMD -m ensurepip --upgrade --default-pip 2>&1 || {
+            echo -e "${YELLOW}ensurepip failed, trying get-pip.py...${NC}"
+            curl -sSL https://bootstrap.pypa.io/get-pip.py | $PYTHON_CMD 2>&1 || {
+                echo -e "${RED}Pip bootstrap failed. Please install pip manually.${NC}"
+                exit 1
+            }
+        }
+        # Try again
+        if $PYTHON_CMD -m pip --version >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ Pip is now working${NC}"
+            PIP_CMD="$PYTHON_CMD -m pip"
+        else
+            echo -e "${RED}Pip verification failed after bootstrap${NC}"
+            exit 1
+        fi
     fi
 else
     if $PIP_CMD --version >/dev/null 2>&1; then
