@@ -19,10 +19,19 @@ def patch_base(file_path):
     
     original_content = content
     
-    # Check if already patched
+    # Remove old patches first (in case of re-patching)
+    # Remove import
+    content = re.sub(r'from hiddify_agent_traffic_manager import init_app\n', '', content)
+    
+    # Remove from extensions list
+    content = re.sub(r'\s+"hiddify_agent_traffic_manager:init_app",\n', '', content)
+    
+    # Remove init_app call
+    content = re.sub(r'\s+app = init_app\(app\)\n', '', content)
+    
+    # Check if already patched (after cleanup)
     if 'hiddify_agent_traffic_manager' in content:
-        print("Already patched (hiddify_agent_traffic_manager found)")
-        return True
+        print("Warning: Still found hiddify_agent_traffic_manager after cleanup, proceeding anyway...")
     
     # Method 1: Add to extensions list
     # Find extensions.extend([ pattern - be careful with indentation
