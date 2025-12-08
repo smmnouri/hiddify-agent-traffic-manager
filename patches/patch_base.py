@@ -20,14 +20,23 @@ def patch_base(file_path):
     original_content = content
     
     # Remove old patches first (in case of re-patching)
-    # Remove import
-    content = re.sub(r'from hiddify_agent_traffic_manager import init_app\n', '', content)
+    # Use line-by-line removal to preserve file structure
+    lines = content.split('\n')
+    new_lines = []
+    skip_next = False
     
-    # Remove from extensions list
-    content = re.sub(r'\s+"hiddify_agent_traffic_manager:init_app",\n', '', content)
+    for i, line in enumerate(lines):
+        # Skip lines that are part of old patches
+        if 'from hiddify_agent_traffic_manager import init_app' in line:
+            continue
+        if '"hiddify_agent_traffic_manager:init_app"' in line:
+            continue
+        if 'app = init_app(app)' in line and 'hiddify_agent_traffic_manager' in '\n'.join(lines[max(0, i-5):i]):
+            continue
+        
+        new_lines.append(line)
     
-    # Remove init_app call
-    content = re.sub(r'\s+app = init_app\(app\)\n', '', content)
+    content = '\n'.join(new_lines)
     
     # Check if already patched (after cleanup)
     if 'hiddify_agent_traffic_manager' in content:
@@ -36,20 +45,27 @@ def patch_base(file_path):
     # Method 1: Add to extensions list
     # Find extensions.extend([ pattern - be careful with indentation
     lines = content.split('\n')
+    patched = False
+    
     for i, line in enumerate(lines):
         if 'extensions.extend([' in line:
             # Get indentation from current line
             indent = len(line) - len(line.lstrip())
             indent_str = ' ' * (indent + 4)
             
-            # Find where to insert (after last extension in the list)
-            # Look for the closing bracket or next item
+            # Find where to insert (before the closing bracket)
             insert_pos = i + 1
             for j in range(i + 1, min(i + 20, len(lines))):
-                if '])' in lines[j] or lines[j].strip().startswith(']'):
+                if '])' in lines[j]:
+                    # Insert before the closing bracket line
+                    insert_pos = j
+                    break
+                elif lines[j].strip() == ']':
+                    # Insert before the closing bracket line
                     insert_pos = j
                     break
                 elif lines[j].strip().startswith('"') or lines[j].strip().startswith("'"):
+                    # Keep track of the last item
                     insert_pos = j + 1
                     continue
             
@@ -58,29 +74,32 @@ def patch_base(file_path):
             lines.insert(insert_pos, new_line)
             content = '\n'.join(lines)
             print("Added to extensions list")
+            patched = True
             break
     
-    # Method 2: Add import and call init_app
-    # Add import after other imports
-    import_pattern = r'(from dynaconf import FlaskDynaconf\n)'
-    if re.search(import_pattern, content):
-        replacement = r'\1from hiddify_agent_traffic_manager import init_app\n'
-        content = re.sub(import_pattern, replacement, content)
-        print("Added import")
-    
-    # Add init_app call before return app - be careful with indentation
-    if 'app = init_app(app)' not in content:
-        lines = content.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip() == 'return app':
-                # Get indentation from return statement
-                indent = len(line) - len(line.lstrip())
-                indent_str = ' ' * indent
-                # Insert before return
-                lines.insert(i, f'{indent_str}app = init_app(app)')
-                content = '\n'.join(lines)
-                print("Added init_app call")
-                break
+    # Method 2: Add import and call init_app (only if Method 1 didn't work)
+    if not patched:
+        # Add import after other imports
+        import_pattern = r'(from dynaconf import FlaskDynaconf\n)'
+        if re.search(import_pattern, content):
+            replacement = r'\1from hiddify_agent_traffic_manager import init_app\n'
+            content = re.sub(import_pattern, replacement, content)
+            print("Added import")
+        
+        # Add init_app call before return app - be careful with indentation
+        if 'app = init_app(app)' not in content:
+            lines = content.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip() == 'return app':
+                    # Get indentation from return statement
+                    indent = len(line) - len(line.lstrip())
+                    indent_str = ' ' * indent
+                    # Insert before return
+                    lines.insert(i, f'{indent_str}app = init_app(app)')
+                    content = '\n'.join(lines)
+                    print("Added init_app call")
+                    patched = True
+                    break
     
     # Check if any changes were made
     if content == original_content:
