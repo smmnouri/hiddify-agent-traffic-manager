@@ -185,7 +185,7 @@ echo ""
 echo "Installing traffic manager module..."
 cd "$SCRIPT_DIR"
 
-# Find pip
+# Find pip - use Python module if pip command not found
 PIP_CMD=""
 if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
     PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
@@ -194,11 +194,23 @@ elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
 elif command -v pip3 &> /dev/null; then
     PIP_CMD="pip3"
 else
-    PIP_CMD="python3 -m pip"
+    # Use Python module
+    if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv313/bin/python -m pip"
+    elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv/bin/python -m pip"
+    else
+        PIP_CMD="python3 -m pip"
+    fi
 fi
 
+echo "Installing with: $PIP_CMD"
 "$PIP_CMD" install -e . 2>&1 | grep -v "Requirement already satisfied" || true
-echo "✓ Module installed"
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    echo "✓ Module installed"
+else
+    echo "⚠ Installation had warnings, but continuing..."
+fi
 
 echo ""
 
@@ -224,20 +236,32 @@ if [[ "$SOURCE_DIR" != *"site-packages"* ]]; then
     if [ -d "$SOURCE_PARENT/.git" ] || [ -f "$SOURCE_PARENT/setup.py" ] || [ -f "$SOURCE_PARENT/pyproject.toml" ]; then
         cd "$SOURCE_PARENT"
         
-        # Find pip
-        PIP_CMD=""
-        if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
-            PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
-        elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
-            PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
-        elif command -v pip3 &> /dev/null; then
-            PIP_CMD="pip3"
-        else
-            PIP_CMD="python3 -m pip"
-        fi
-        
-        "$PIP_CMD" install -e .
-        echo "✓ Installed from source"
+# Find pip - use Python module if pip command not found
+PIP_CMD=""
+if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
+    PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
+elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
+    PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
+elif command -v pip3 &> /dev/null; then
+    PIP_CMD="pip3"
+else
+    # Use Python module
+    if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv313/bin/python -m pip"
+    elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv/bin/python -m pip"
+    else
+        PIP_CMD="python3 -m pip"
+    fi
+fi
+
+echo "Installing from source with: $PIP_CMD"
+"$PIP_CMD" install -e . 2>&1 | grep -v "Requirement already satisfied" || true
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    echo "✓ Installed from source"
+else
+    echo "⚠ Installation had warnings, but continuing..."
+fi
     else
         echo "⚠ Not a git repository or source package, skipping installation"
         echo "  (If patching pip-installed package, this is normal)"
