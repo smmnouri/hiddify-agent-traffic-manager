@@ -32,15 +32,27 @@ if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
     cp "$BACKUP" "$BASE_PY"
     echo "✓ Restored"
 else
-    echo "⚠ No backup found, checking syntax..."
+    echo "⚠ No backup found, trying to remove patches..."
+    cd "$HIDDIFY_DIR/hiddify-agent-traffic-manager"
+    if [ -f "patches/unpatch_base.py" ]; then
+        VENV_PYTHON=""
+        if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+            VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
+        else
+            VENV_PYTHON="python3"
+        fi
+        "$VENV_PYTHON" patches/unpatch_base.py "$BASE_PY" 2>/dev/null || true
+    fi
+    
+    # Check syntax
     python3 -m py_compile "$BASE_PY" 2>&1
     if [ $? -ne 0 ]; then
-        echo "✗ File has syntax errors and no backup available"
+        echo "✗ File still has syntax errors"
         exit 1
     fi
 fi
 
-# Re-patch with correct script
+# Re-patch with corrected script
 echo ""
 echo "Re-patching with corrected script..."
 cd "$HIDDIFY_DIR/hiddify-agent-traffic-manager"
@@ -51,6 +63,12 @@ else
     VENV_PYTHON="python3"
 fi
 
+# Remove old patches first
+if [ -f "patches/unpatch_base.py" ]; then
+    "$VENV_PYTHON" patches/unpatch_base.py "$BASE_PY" 2>/dev/null || true
+fi
+
+# Apply new patch
 "$VENV_PYTHON" patches/patch_base.py "$BASE_PY"
 
 # Verify syntax
