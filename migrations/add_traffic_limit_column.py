@@ -78,31 +78,69 @@ if __name__ == '__main__':
             # Try to get database URL from environment or config
             db_url = os.getenv('DATABASE_URL')
             if not db_url:
-                # Try to find database file
-                possible_db_paths = [
-                    '/opt/hiddify-manager/config/hiddify-panel.db',
-                    '/opt/hiddify/config/hiddify-panel.db',
-                    os.path.expanduser('~/.config/hiddify/hiddify-panel.db'),
-                ]
-                
-                # Also check config directory
-                config_path = os.getenv('HIDDIFY_CONFIG_PATH')
-                if config_path:
-                    possible_db_paths.insert(0, os.path.join(config_path, 'hiddify-panel.db'))
-                
-                for db_path in possible_db_paths:
-                    if os.path.exists(db_path):
-                        db_url = f'sqlite:///{db_path}'
-                        print(f"Found database at: {db_path}")
-                        break
+                # Try to read from HiddifyPanel config
+                try:
+                    import json
+                    config_paths = [
+                        '/opt/hiddify-manager/config',
+                        '/opt/hiddify/config',
+                        os.path.expanduser('~/.config/hiddify'),
+                    ]
+                    
+                    config_path = os.getenv('HIDDIFY_CONFIG_PATH')
+                    if config_path:
+                        config_paths.insert(0, config_path)
+                    
+                    for config_dir in config_paths:
+                        config_file = os.path.join(config_dir, 'config.json')
+                        if os.path.exists(config_file):
+                            with open(config_file, 'r') as f:
+                                config = json.load(f)
+                                if 'database' in config:
+                                    db_url = config['database']
+                                    print(f"Found database URL in config: {config_file}")
+                                    break
+                except Exception as e:
+                    print(f"Could not read config: {e}")
                 
                 if not db_url:
-                    print("Error: Could not find database file.")
-                    print("Searched in:")
-                    for path in possible_db_paths:
-                        print(f"  - {path}")
-                    print("\nPlease set DATABASE_URL environment variable or ensure database file exists.")
-                    sys.exit(1)
+                    # Try to find database file
+                    possible_db_paths = [
+                        '/opt/hiddify-manager/config/hiddify-panel.db',
+                        '/opt/hiddify-manager/hiddify-panel.db',
+                        '/opt/hiddify/config/hiddify-panel.db',
+                        '/opt/hiddify/hiddify-panel.db',
+                        os.path.expanduser('~/.config/hiddify/hiddify-panel.db'),
+                    ]
+                    
+                    # Search for any .db file in config directories
+                    for config_dir in config_paths:
+                        if os.path.isdir(config_dir):
+                            for file in os.listdir(config_dir):
+                                if file.endswith('.db'):
+                                    possible_db_paths.append(os.path.join(config_dir, file))
+                    
+                    # Also search recursively
+                    print("Searching for database files...")
+                    for root, dirs, files in os.walk('/opt/hiddify-manager'):
+                        for file in files:
+                            if file.endswith('.db') and 'hiddify' in file.lower():
+                                possible_db_paths.append(os.path.join(root, file))
+                    
+                    for db_path in possible_db_paths:
+                        if os.path.exists(db_path):
+                            db_url = f'sqlite:///{db_path}'
+                            print(f"Found database at: {db_path}")
+                            break
+                    
+                    if not db_url:
+                        print("Error: Could not find database file.")
+                        print("Searched in:")
+                        for path in set(possible_db_paths[:10]):  # Show first 10 unique paths
+                            print(f"  - {path}")
+                        print("\nTrying to use HiddifyPanel's database connection directly...")
+                        # Try one more time with hiddifypanel database module
+                        raise Exception("Database file not found")
             
             print(f"Connecting to database: {db_url}")
             engine = create_engine(db_url)
