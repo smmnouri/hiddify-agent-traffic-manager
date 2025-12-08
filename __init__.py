@@ -6,32 +6,8 @@ Hiddify Agent Traffic Manager
 __version__ = "1.0.0"
 __author__ = "Hiddify Agent Traffic Manager"
 
-# Import with error handling to prevent crash
-try:
-    from .models.agent_traffic import init_agent_traffic
-    from .utils.traffic_calculator import AgentTrafficCalculator
-    from .utils.traffic_checker import AgentTrafficChecker
-    from .tasks.periodic_checker import setup_periodic_checker
-    from .utils.user_creation_hook import init_user_creation_hook
-except ImportError as e:
-    # If imports fail, create dummy functions
-    from loguru import logger
-    logger.error(f"Failed to import agent traffic manager modules: {e}")
-    
-    def init_agent_traffic(app):
-        pass
-    
-    class AgentTrafficCalculator:
-        pass
-    
-    class AgentTrafficChecker:
-        pass
-    
-    def setup_periodic_checker(app):
-        pass
-    
-    def init_user_creation_hook():
-        pass
+# Lazy imports to avoid circular import issues
+# These will be imported when actually needed, not at module level
 
 def init_app(app):
     """Initialize the agent traffic manager extension
@@ -42,6 +18,8 @@ def init_app(app):
     from loguru import logger
     
     try:
+        # Lazy import to avoid circular import issues
+        from .models.agent_traffic import init_agent_traffic
         # Initialize database extensions
         init_agent_traffic(app)
     except Exception as e:
@@ -51,6 +29,8 @@ def init_app(app):
         # Continue anyway
     
     try:
+        # Lazy import to avoid circular import issues
+        from .utils.user_creation_hook import init_user_creation_hook
         # Setup user creation hooks
         init_user_creation_hook()
     except Exception as e:
@@ -60,6 +40,8 @@ def init_app(app):
         # Continue anyway
     
     try:
+        # Lazy import to avoid circular import issues
+        from .tasks.periodic_checker import setup_periodic_checker
         # Setup periodic checker
         setup_periodic_checker(app)
     except Exception as e:
@@ -163,10 +145,26 @@ def init_app(app):
     
     return app
 
+# Lazy getters for classes to avoid import errors
+def get_AgentTrafficCalculator():
+    """Lazy getter for AgentTrafficCalculator"""
+    from .utils.traffic_calculator import AgentTrafficCalculator
+    return AgentTrafficCalculator
+
+def get_AgentTrafficChecker():
+    """Lazy getter for AgentTrafficChecker"""
+    from .utils.traffic_checker import AgentTrafficChecker
+    return AgentTrafficChecker
+
+def get_setup_periodic_checker():
+    """Lazy getter for setup_periodic_checker"""
+    from .tasks.periodic_checker import setup_periodic_checker
+    return setup_periodic_checker
+
 __all__ = [
     'init_app',
-    'AgentTrafficCalculator',
-    'AgentTrafficChecker',
-    'setup_periodic_checker'
+    'get_AgentTrafficCalculator',
+    'get_AgentTrafficChecker',
+    'get_setup_periodic_checker'
 ]
 
