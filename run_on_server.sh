@@ -55,12 +55,36 @@ else
         if [ -z "$SOURCE_DIR" ]; then
             echo "✗ Source directory not found"
             echo ""
-            echo "Please clone HiddifyPanel first:"
-            echo "  cd $HIDDIFY_DIR"
-            echo "  git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
-            echo ""
-            echo "Or if you want to patch the installed package, make sure HiddifyPanel is installed via pip"
-            exit 1
+            echo "Attempting to clone HiddifyPanel..."
+            
+            # Check if git is available
+            if ! command -v git &> /dev/null; then
+                echo "✗ git is not installed. Please install git first."
+                exit 1
+            fi
+            
+            # Clone HiddifyPanel
+            cd "$HIDDIFY_DIR"
+            if [ -d "hiddify-panel-source" ]; then
+                echo "⚠ hiddify-panel-source directory exists but is empty or invalid"
+                echo "Removing and re-cloning..."
+                rm -rf hiddify-panel-source
+            fi
+            
+            echo "Cloning HiddifyPanel from GitHub..."
+            git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source
+            
+            if [ $? -eq 0 ] && [ -d "hiddify-panel-source/src" ] && [ "$(ls -A hiddify-panel-source/src 2>/dev/null)" ]; then
+                SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-source/src"
+                echo "✓ Successfully cloned and found source: $SOURCE_DIR"
+            else
+                echo "✗ Failed to clone or source directory is empty"
+                echo ""
+                echo "Please clone manually:"
+                echo "  cd $HIDDIFY_DIR"
+                echo "  git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
+                exit 1
+            fi
         fi
     fi
 fi
