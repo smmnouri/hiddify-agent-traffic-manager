@@ -31,9 +31,13 @@ if [ -d "src/hiddifypanel" ] || [ -d "hiddifypanel" ]; then
     fi
 fi
 
-# If not found, check standard locations
+# If not found, check standard locations (prioritize source directories)
 if [ -z "$SOURCE_DIR" ]; then
-    if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-custom/src 2>/dev/null)" ]; then
+    # First check hiddify-panel-source (most likely to be the cloned source)
+    if [ -d "$HIDDIFY_DIR/hiddify-panel-source/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-source/src 2>/dev/null)" ]; then
+        SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-source/src"
+        echo -e "${GREEN}Found in hiddify-panel-source${NC}"
+    elif [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-custom/src 2>/dev/null)" ]; then
         SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
         echo -e "${GREEN}Found in hiddify-panel-custom${NC}"
     elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel/src 2>/dev/null)" ]; then
@@ -61,6 +65,8 @@ if [ -z "$SOURCE_DIR" ]; then
         VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
     elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
         VENV_PYTHON="$HIDDIFY_DIR/.venv/bin/python"
+    elif command -v python3 &> /dev/null; then
+        VENV_PYTHON="python3"
     fi
     
     if [ -n "$VENV_PYTHON" ]; then
@@ -272,7 +278,25 @@ if [ "$INSTALLED_VIA_PIP" = true ]; then
     echo "3. Install from source: cd $HIDDIFY_DIR/hiddify-panel-source && pip install -e ."
 else
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "1. Install from source: cd $SOURCE_DIR/.. && /opt/hiddify-manager/.venv313/bin/pip install -e ."
+    # Find pip
+    PIP_CMD=""
+    if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
+    elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
+        PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
+    elif command -v pip3 &> /dev/null; then
+        PIP_CMD="pip3"
+    elif command -v pip &> /dev/null; then
+        PIP_CMD="pip"
+    fi
+    
+    if [ -n "$PIP_CMD" ]; then
+        SOURCE_PARENT="$(dirname "$SOURCE_DIR")"
+        echo "1. Install from source: cd $SOURCE_PARENT && $PIP_CMD install -e ."
+    else
+        echo "1. Install from source: cd $(dirname "$SOURCE_DIR") && pip install -e ."
+        echo -e "${YELLOW}   (Note: Please find the correct pip command for your virtual environment)${NC}"
+    fi
     echo "2. Restart services: systemctl restart hiddify-panel hiddify-panel-background-tasks"
 fi
 
