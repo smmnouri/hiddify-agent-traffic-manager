@@ -191,92 +191,101 @@ def patch_adminstrator_admin(file_path):
                 formatter_indent = ' ' * (len(line) - len(line.lstrip()))
                 break
         
-        # Add formatter functions before column_formatters dict
-        formatter_functions = f'''
-{formatter_indent}def _format_traffic_limit(view, context, model, name):
-{formatter_indent}    """Format traffic limit column"""
-{formatter_indent}    from hiddifypanel.models.admin import AdminMode
-{formatter_indent}    from markupsafe import Markup
-{formatter_indent}    from flask_babel import gettext as _
-{formatter_indent}    if model.mode != AdminMode.agent:
-{formatter_indent}        return '-'
-{formatter_indent}    try:
-{formatter_indent}        limit = model.traffic_limit_GB if hasattr(model, 'traffic_limit_GB') else None
-{formatter_indent}        if limit is None:
-{formatter_indent}            return Markup('<span class="badge badge-info">' + _('Unlimited') + '</span>')
-{formatter_indent}        return f"{{limit:.2f}} GB"
-{formatter_indent}    except Exception:
-{formatter_indent}        return '-'
-{formatter_indent}
-{formatter_indent}def _format_total_traffic(view, context, model, name):
-{formatter_indent}    """Format total traffic column"""
-{formatter_indent}    from hiddifypanel.models.admin import AdminMode
-{formatter_indent}    if model.mode != AdminMode.agent:
-{formatter_indent}        return '-'
-{formatter_indent}    try:
-{formatter_indent}        total = model.get_total_traffic_GB() if hasattr(model, 'get_total_traffic_GB') else 0
-{formatter_indent}        return f"{{total:.2f}} GB"
-{formatter_indent}    except Exception:
-{formatter_indent}        return '-'
-{formatter_indent}
-{formatter_indent}def _format_remaining_traffic(view, context, model, name):
-{formatter_indent}    """Format remaining traffic column"""
-{formatter_indent}    from hiddifypanel.models.admin import AdminMode
-{formatter_indent}    from markupsafe import Markup
-{formatter_indent}    from flask_babel import gettext as _
-{formatter_indent}    if model.mode != AdminMode.agent:
-{formatter_indent}        return '-'
-{formatter_indent}    try:
-{formatter_indent}        remaining = model.get_remaining_traffic_GB() if hasattr(model, 'get_remaining_traffic_GB') else None
-{formatter_indent}        if remaining is None:
-{formatter_indent}            return Markup('<span class="badge badge-info">' + _('Unlimited') + '</span>')
-{formatter_indent}        return f"{{remaining:.2f}} GB"
-{formatter_indent}    except Exception:
-{formatter_indent}        return '-'
-{formatter_indent}
-{formatter_indent}def _format_traffic_status(view, context, model, name):
-{formatter_indent}    """Format traffic status column with progress bar"""
-{formatter_indent}    from hiddifypanel.models.admin import AdminMode
-{formatter_indent}    from markupsafe import Markup
-{formatter_indent}    from flask_babel import gettext as _
-{formatter_indent}    if model.mode != AdminMode.agent:
-{formatter_indent}        return '-'
-{formatter_indent}    try:
-{formatter_indent}        if not hasattr(model, 'traffic_limit_GB') or model.traffic_limit_GB is None:
-{formatter_indent}            return Markup('<span class="badge badge-info">' + _('No Limit') + '</span>')
-{formatter_indent}        total_gb = model.get_total_traffic_GB() if hasattr(model, 'get_total_traffic_GB') else 0
-{formatter_indent}        limit_gb = model.traffic_limit_GB
-{formatter_indent}        usage_percent = min((total_gb / limit_gb) * 100, 100) if limit_gb > 0 else 0
-{formatter_indent}        is_exceeded = model.is_traffic_limit_exceeded() if hasattr(model, 'is_traffic_limit_exceeded') else False
-{formatter_indent}        if is_exceeded:
-{formatter_indent}            color = "#ff7e7e"
-{formatter_indent}            badge_class = "badge-danger"
-{formatter_indent}            status_text = _('Exceeded')
-{formatter_indent}        elif usage_percent > 90:
-{formatter_indent}            color = "#ffc107"
-{formatter_indent}            badge_class = "badge-warning"
-{formatter_indent}            status_text = _('Warning')
-{formatter_indent}        else:
-{formatter_indent}            color = "#9ee150"
-{formatter_indent}            badge_class = "badge-success"
-{formatter_indent}            status_text = _('OK')
-{formatter_indent}        return Markup(f"""
-{formatter_indent}            <div class="progress progress-lg position-relative" style="min-width: 100px;">
-{formatter_indent}              <div class="progress-bar progress-bar-striped" role="progressbar" style="width: {{usage_percent:.1f}}%;background-color: {{color}};" aria-valuenow="{{usage_percent:.1f}}" aria-valuemin="0" aria-valuemax="100"></div>
-{formatter_indent}              <span class='badge position-absolute {{badge_class}}' style="left:auto;right:auto;width: 100%;font-size:1em">{{status_text}} ({{usage_percent:.1f}}%)</span>
-{formatter_indent}            </div>
-{formatter_indent}            """)
-{formatter_indent}    except Exception:
-{formatter_indent}        return '-'
-'''
-        # Insert before column_formatters
-        column_formatters_pattern = r'(column_formatters = \{)'
-        if re.search(column_formatters_pattern, content):
-            content = re.sub(
-                column_formatters_pattern,
-                formatter_functions + r'\n    \1',
-                content
-            )
+        # Find where to insert (before column_formatters)
+        insert_pos = -1
+        for i, line in enumerate(lines):
+            if 'column_formatters = {' in line:
+                insert_pos = i
+                break
+        
+        if insert_pos > 0:
+            # Build formatter functions with correct indentation
+            formatter_lines = [
+                '',
+                f'{formatter_indent}def _format_traffic_limit(view, context, model, name):',
+                f'{formatter_indent}    """Format traffic limit column"""',
+                f'{formatter_indent}    from hiddifypanel.models.admin import AdminMode',
+                f'{formatter_indent}    from markupsafe import Markup',
+                f'{formatter_indent}    from flask_babel import gettext as _',
+                f'{formatter_indent}    if model.mode != AdminMode.agent:',
+                f'{formatter_indent}        return \'-\'',
+                f'{formatter_indent}    try:',
+                f'{formatter_indent}        limit = model.traffic_limit_GB if hasattr(model, \'traffic_limit_GB\') else None',
+                f'{formatter_indent}        if limit is None:',
+                f'{formatter_indent}            return Markup(\'<span class="badge badge-info">\' + _(\'Unlimited\') + \'</span>\')',
+                f'{formatter_indent}        return f"{{limit:.2f}} GB"',
+                f'{formatter_indent}    except Exception:',
+                f'{formatter_indent}        return \'-\'',
+                '',
+                f'{formatter_indent}def _format_total_traffic(view, context, model, name):',
+                f'{formatter_indent}    """Format total traffic column"""',
+                f'{formatter_indent}    from hiddifypanel.models.admin import AdminMode',
+                f'{formatter_indent}    if model.mode != AdminMode.agent:',
+                f'{formatter_indent}        return \'-\'',
+                f'{formatter_indent}    try:',
+                f'{formatter_indent}        total = model.get_total_traffic_GB() if hasattr(model, \'get_total_traffic_GB\') else 0',
+                f'{formatter_indent}        return f"{{total:.2f}} GB"',
+                f'{formatter_indent}    except Exception:',
+                f'{formatter_indent}        return \'-\'',
+                '',
+                f'{formatter_indent}def _format_remaining_traffic(view, context, model, name):',
+                f'{formatter_indent}    """Format remaining traffic column"""',
+                f'{formatter_indent}    from hiddifypanel.models.admin import AdminMode',
+                f'{formatter_indent}    from markupsafe import Markup',
+                f'{formatter_indent}    from flask_babel import gettext as _',
+                f'{formatter_indent}    if model.mode != AdminMode.agent:',
+                f'{formatter_indent}        return \'-\'',
+                f'{formatter_indent}    try:',
+                f'{formatter_indent}        remaining = model.get_remaining_traffic_GB() if hasattr(model, \'get_remaining_traffic_GB\') else None',
+                f'{formatter_indent}        if remaining is None:',
+                f'{formatter_indent}            return Markup(\'<span class="badge badge-info">\' + _(\'Unlimited\') + \'</span>\')',
+                f'{formatter_indent}        return f"{{remaining:.2f}} GB"',
+                f'{formatter_indent}    except Exception:',
+                f'{formatter_indent}        return \'-\'',
+                '',
+                f'{formatter_indent}def _format_traffic_status(view, context, model, name):',
+                f'{formatter_indent}    """Format traffic status column with progress bar"""',
+                f'{formatter_indent}    from hiddifypanel.models.admin import AdminMode',
+                f'{formatter_indent}    from markupsafe import Markup',
+                f'{formatter_indent}    from flask_babel import gettext as _',
+                f'{formatter_indent}    if model.mode != AdminMode.agent:',
+                f'{formatter_indent}        return \'-\'',
+                f'{formatter_indent}    try:',
+                f'{formatter_indent}        if not hasattr(model, \'traffic_limit_GB\') or model.traffic_limit_GB is None:',
+                f'{formatter_indent}            return Markup(\'<span class="badge badge-info">\' + _(\'No Limit\') + \'</span>\')',
+                f'{formatter_indent}        total_gb = model.get_total_traffic_GB() if hasattr(model, \'get_total_traffic_GB\') else 0',
+                f'{formatter_indent}        limit_gb = model.traffic_limit_GB',
+                f'{formatter_indent}        usage_percent = min((total_gb / limit_gb) * 100, 100) if limit_gb > 0 else 0',
+                f'{formatter_indent}        is_exceeded = model.is_traffic_limit_exceeded() if hasattr(model, \'is_traffic_limit_exceeded\') else False',
+                f'{formatter_indent}        if is_exceeded:',
+                f'{formatter_indent}            color = "#ff7e7e"',
+                f'{formatter_indent}            badge_class = "badge-danger"',
+                f'{formatter_indent}            status_text = _(\'Exceeded\')',
+                f'{formatter_indent}        elif usage_percent > 90:',
+                f'{formatter_indent}            color = "#ffc107"',
+                f'{formatter_indent}            badge_class = "badge-warning"',
+                f'{formatter_indent}            status_text = _(\'Warning\')',
+                f'{formatter_indent}        else:',
+                f'{formatter_indent}            color = "#9ee150"',
+                f'{formatter_indent}            badge_class = "badge-success"',
+                f'{formatter_indent}            status_text = _(\'OK\')',
+                f'{formatter_indent}        return Markup(f"""',
+                f'{formatter_indent}            <div class="progress progress-lg position-relative" style="min-width: 100px;">',
+                f'{formatter_indent}              <div class="progress-bar progress-bar-striped" role="progressbar" style="width: {{usage_percent:.1f}}%;background-color: {{color}};" aria-valuenow="{{usage_percent:.1f}}" aria-valuemin="0" aria-valuemax="100"></div>',
+                f'{formatter_indent}              <span class=\'badge position-absolute {{badge_class}}\' style="left:auto;right:auto;width: 100%;font-size:1em">{{status_text}} ({{usage_percent:.1f}}%)</span>',
+                f'{formatter_indent}            </div>',
+                f'{formatter_indent}            """)',
+                f'{formatter_indent}    except Exception:',
+                f'{formatter_indent}        return \'-\'',
+                ''
+            ]
+            
+            # Insert the formatter functions before column_formatters
+            for i, formatter_line in enumerate(formatter_lines):
+                lines.insert(insert_pos + i, formatter_line)
+            
+            content = '\n'.join(lines)
+            print("Added formatter functions before column_formatters")
     
     # 8. Add formatters to column_formatters dict
     column_formatters_pattern = r"('UserLinks': _ul_formatter\s*\n\s*\})"
