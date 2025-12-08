@@ -25,13 +25,29 @@ def patch_base(file_path):
         return True
     
     # Method 1: Add to extensions list
-    # Find extensions.extend([ pattern
+    # Find extensions.extend([ pattern - be careful with indentation
     extensions_pattern = r"(extensions\.extend\(\[)"
     if re.search(extensions_pattern, content):
-        # Add after other extensions
-        replacement = r'\1\n            "hiddify_agent_traffic_manager:init_app",'
-        content = re.sub(extensions_pattern, replacement, content, count=1)
-        print("Added to extensions list")
+        # Find the indentation of the line before extensions.extend
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if 'extensions.extend([' in line:
+                # Get indentation from previous line or current line
+                if i > 0:
+                    prev_line = lines[i-1]
+                    indent = len(prev_line) - len(prev_line.lstrip())
+                    if indent == 0:
+                        # Use current line indentation
+                        indent = len(line) - len(line.lstrip())
+                else:
+                    indent = len(line) - len(line.lstrip())
+                
+                # Add with correct indentation
+                indent_str = ' ' * (indent + 4)
+                replacement = f'{line}\n{indent_str}"hiddify_agent_traffic_manager:init_app",'
+                content = '\n'.join(lines[:i]) + '\n' + replacement + '\n' + '\n'.join(lines[i+1:])
+                print("Added to extensions list")
+                break
     
     # Method 2: Add import and call init_app
     # Add import after other imports
@@ -41,12 +57,17 @@ def patch_base(file_path):
         content = re.sub(import_pattern, replacement, content)
         print("Added import")
     
-    # Add init_app call before return app
+    # Add init_app call before return app - be careful with indentation
     return_pattern = r'(\s+return app\n)'
     if re.search(return_pattern, content) and 'app = init_app(app)' not in content:
-        replacement = r'    app = init_app(app)\n\1'
-        content = re.sub(return_pattern, replacement, content, count=1)
-        print("Added init_app call")
+        # Get indentation from return statement
+        match = re.search(return_pattern, content)
+        if match:
+            indent = len(match.group(1)) - len('return app\n')
+            indent_str = ' ' * indent
+            replacement = f'{indent_str}app = init_app(app)\n{match.group(1)}'
+            content = re.sub(return_pattern, replacement, content, count=1)
+            print("Added init_app call")
     
     # Check if any changes were made
     if content == original_content:
