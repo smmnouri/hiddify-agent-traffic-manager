@@ -18,10 +18,11 @@ echo ""
 
 # Find source directory - check multiple locations
 SOURCE_DIR=""
+INSTALLED_VIA_PIP=false
 
 # First, check if we're already in a source directory
 if [ -d "src/hiddifypanel" ] || [ -d "hiddifypanel" ]; then
-    if [ -d "src" ]; then
+    if [ -d "src" ] && [ "$(ls -A src 2>/dev/null)" ]; then
         SOURCE_DIR="$(pwd)/src"
         echo -e "${GREEN}Found source in current directory: $SOURCE_DIR${NC}"
     elif [ -d "hiddifypanel" ]; then
@@ -32,21 +33,45 @@ fi
 
 # If not found, check standard locations
 if [ -z "$SOURCE_DIR" ]; then
-    if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ]; then
+    if [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-custom/src 2>/dev/null)" ]; then
         SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
         echo -e "${GREEN}Found in hiddify-panel-custom${NC}"
-    elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ]; then
+    elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel/src 2>/dev/null)" ]; then
         SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
         echo -e "${GREEN}Found in hiddify-panel${NC}"
     fi
 fi
 
-# If still not found, search
+# If still not found, search for source
 if [ -z "$SOURCE_DIR" ]; then
     FOUND=$(find "$HIDDIFY_DIR" -type d -name "hiddifypanel" -path "*/src/hiddifypanel" 2>/dev/null | head -n1 | sed 's|/hiddifypanel$||')
-    if [ -n "$FOUND" ] && [ -d "$FOUND" ]; then
+    if [ -n "$FOUND" ] && [ -d "$FOUND" ] && [ "$(ls -A $FOUND 2>/dev/null)" ]; then
         SOURCE_DIR="$FOUND"
         echo -e "${GREEN}Found via search: $SOURCE_DIR${NC}"
+    fi
+fi
+
+# If source not found, check if installed via pip (in site-packages)
+if [ -z "$SOURCE_DIR" ]; then
+    echo -e "${YELLOW}Source directory not found. Checking if HiddifyPanel is installed via pip...${NC}"
+    
+    # Find Python virtual environment
+    VENV_PYTHON=""
+    if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+        VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
+    elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
+        VENV_PYTHON="$HIDDIFY_DIR/.venv/bin/python"
+    fi
+    
+    if [ -n "$VENV_PYTHON" ]; then
+        # Get site-packages path
+        SITE_PACKAGES=$("$VENV_PYTHON" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null)
+        if [ -n "$SITE_PACKAGES" ] && [ -d "$SITE_PACKAGES/hiddifypanel" ]; then
+            SOURCE_DIR="$SITE_PACKAGES"
+            INSTALLED_VIA_PIP=true
+            echo -e "${GREEN}Found HiddifyPanel installed via pip in: $SOURCE_DIR${NC}"
+            echo -e "${YELLOW}Note: Patching installed package. Consider installing from source for better control.${NC}"
+        fi
     fi
 fi
 
@@ -57,7 +82,11 @@ if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
     echo "  - $HIDDIFY_DIR/hiddify-panel-custom/src"
     echo "  - $HIDDIFY_DIR/hiddify-panel/src"
     echo ""
-    echo -e "${YELLOW}Please make sure HiddifyPanel is cloned or run from the correct directory${NC}"
+    echo -e "${YELLOW}Options:${NC}"
+    echo "1. Clone HiddifyPanel source:"
+    echo "   cd $HIDDIFY_DIR && git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
+    echo ""
+    echo "2. Or patch the installed package (if installed via pip)"
     exit 1
 fi
 
@@ -231,7 +260,19 @@ echo -e "${GREEN}==========================================${NC}"
 echo -e "${GREEN}All patches applied successfully!${NC}"
 echo -e "${GREEN}==========================================${NC}"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Install from source: cd $SOURCE_DIR && /opt/hiddify-manager/.venv313/bin/pip install -e ."
-echo "2. Restart services: systemctl restart hiddify-panel hiddify-panel-background-tasks"
+
+if [ "$INSTALLED_VIA_PIP" = true ]; then
+    echo -e "${YELLOW}Note: Patched installed package. Changes will be lost on next pip upgrade.${NC}"
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "1. Restart services: systemctl restart hiddify-panel hiddify-panel-background-tasks"
+    echo ""
+    echo -e "${YELLOW}For permanent changes, consider:${NC}"
+    echo "1. Clone HiddifyPanel: cd $HIDDIFY_DIR && git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
+    echo "2. Apply patches to source"
+    echo "3. Install from source: cd $HIDDIFY_DIR/hiddify-panel-source && pip install -e ."
+else
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "1. Install from source: cd $SOURCE_DIR/.. && /opt/hiddify-manager/.venv313/bin/pip install -e ."
+    echo "2. Restart services: systemctl restart hiddify-panel hiddify-panel-background-tasks"
+fi
 
