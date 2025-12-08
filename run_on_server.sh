@@ -184,13 +184,20 @@ echo ""
 # Step 4: Install module first
 echo "Installing traffic manager module..."
 cd "$SCRIPT_DIR"
+
+# Find pip
+PIP_CMD=""
 if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
-    "$HIDDIFY_DIR/.venv313/bin/pip" install -e . > /dev/null 2>&1
+    PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
 elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
-    "$HIDDIFY_DIR/.venv/bin/pip" install -e . > /dev/null 2>&1
+    PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
+elif command -v pip3 &> /dev/null; then
+    PIP_CMD="pip3"
 else
-    pip3 install -e . > /dev/null 2>&1
+    PIP_CMD="python3 -m pip"
 fi
+
+"$PIP_CMD" install -e . 2>&1 | grep -v "Requirement already satisfied" || true
 echo "✓ Module installed"
 
 echo ""

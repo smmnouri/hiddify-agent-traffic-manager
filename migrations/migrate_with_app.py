@@ -121,6 +121,7 @@ except RuntimeError as e:
                 if 'traffic_limit' not in columns:
                     print("Adding traffic_limit column...")
                     with engine.connect() as conn:
+                        # Use autocommit for ALTER TABLE
                         conn.execute(text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
                         conn.commit()
                     print("✓ Column added successfully (direct connection)")
