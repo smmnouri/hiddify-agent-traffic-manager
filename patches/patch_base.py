@@ -26,28 +26,30 @@ def patch_base(file_path):
     
     # Method 1: Add to extensions list
     # Find extensions.extend([ pattern - be careful with indentation
-    extensions_pattern = r"(extensions\.extend\(\[)"
-    if re.search(extensions_pattern, content):
-        # Find the indentation of the line before extensions.extend
-        lines = content.split('\n')
-        for i, line in enumerate(lines):
-            if 'extensions.extend([' in line:
-                # Get indentation from previous line or current line
-                if i > 0:
-                    prev_line = lines[i-1]
-                    indent = len(prev_line) - len(prev_line.lstrip())
-                    if indent == 0:
-                        # Use current line indentation
-                        indent = len(line) - len(line.lstrip())
-                else:
-                    indent = len(line) - len(line.lstrip())
-                
-                # Add with correct indentation
-                indent_str = ' ' * (indent + 4)
-                replacement = f'{line}\n{indent_str}"hiddify_agent_traffic_manager:init_app",'
-                content = '\n'.join(lines[:i]) + '\n' + replacement + '\n' + '\n'.join(lines[i+1:])
-                print("Added to extensions list")
-                break
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        if 'extensions.extend([' in line:
+            # Get indentation from current line
+            indent = len(line) - len(line.lstrip())
+            indent_str = ' ' * (indent + 4)
+            
+            # Find where to insert (after last extension in the list)
+            # Look for the closing bracket or next item
+            insert_pos = i + 1
+            for j in range(i + 1, min(i + 20, len(lines))):
+                if '])' in lines[j] or lines[j].strip().startswith(']'):
+                    insert_pos = j
+                    break
+                elif lines[j].strip().startswith('"') or lines[j].strip().startswith("'"):
+                    insert_pos = j + 1
+                    continue
+            
+            # Insert the new extension
+            new_line = f'{indent_str}"hiddify_agent_traffic_manager:init_app",'
+            lines.insert(insert_pos, new_line)
+            content = '\n'.join(lines)
+            print("Added to extensions list")
+            break
     
     # Method 2: Add import and call init_app
     # Add import after other imports
@@ -58,16 +60,18 @@ def patch_base(file_path):
         print("Added import")
     
     # Add init_app call before return app - be careful with indentation
-    return_pattern = r'(\s+return app\n)'
-    if re.search(return_pattern, content) and 'app = init_app(app)' not in content:
-        # Get indentation from return statement
-        match = re.search(return_pattern, content)
-        if match:
-            indent = len(match.group(1)) - len('return app\n')
-            indent_str = ' ' * indent
-            replacement = f'{indent_str}app = init_app(app)\n{match.group(1)}'
-            content = re.sub(return_pattern, replacement, content, count=1)
-            print("Added init_app call")
+    if 'app = init_app(app)' not in content:
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip() == 'return app':
+                # Get indentation from return statement
+                indent = len(line) - len(line.lstrip())
+                indent_str = ' ' * indent
+                # Insert before return
+                lines.insert(i, f'{indent_str}app = init_app(app)')
+                content = '\n'.join(lines)
+                print("Added init_app call")
+                break
     
     # Check if any changes were made
     if content == original_content:
