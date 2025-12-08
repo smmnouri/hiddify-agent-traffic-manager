@@ -1,10 +1,7 @@
 """
 Utility functions for checking traffic limits before user creation
 """
-from hiddifypanel.models.admin import AdminUser
-from hiddifypanel.models.user import User
 from loguru import logger
-from flask import abort
 from flask_babel import gettext as _
 
 
@@ -23,6 +20,7 @@ class AgentTrafficChecker:
         Returns:
             tuple: (can_create: bool, error_message: str | None)
         """
+        from hiddifypanel.models.admin import AdminUser
         agent = AdminUser.query.get(agent_id)
         if not agent:
             return False, "Agent not found"
@@ -74,6 +72,7 @@ class AgentTrafficChecker:
         Returns:
             True if users were disabled, False otherwise
         """
+        from hiddifypanel.models.admin import AdminUser
         agent = AdminUser.query.get(agent_id)
         if not agent:
             return False
@@ -97,7 +96,7 @@ class AgentTrafficChecker:
         Returns:
             تعداد ایجنت‌هایی که از حد تجاوز کرده‌اند
         """
-        from hiddifypanel.models.admin import AdminMode
+        from hiddifypanel.models.admin import AdminUser, AdminMode
         
         agents = AdminUser.query.filter(
             AdminUser.mode == AdminMode.agent

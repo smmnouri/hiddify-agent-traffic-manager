@@ -1,9 +1,6 @@
 """
 Utility functions for calculating agent traffic
 """
-from hiddifypanel.models.admin import AdminUser
-from hiddifypanel.models.user import User
-from hiddifypanel.database import db
 from sqlalchemy import func
 from loguru import logger
 
@@ -24,6 +21,7 @@ class AgentTrafficCalculator:
         Returns:
             مجموع ترافیک به بایت
         """
+        from hiddifypanel.models.admin import AdminUser
         agent = AdminUser.query.get(agent_id)
         if not agent:
             logger.error(f"Agent with ID {agent_id} not found")
@@ -53,7 +51,7 @@ class AgentTrafficCalculator:
         Returns:
             لیست دیکشنری شامل اطلاعات ترافیک هر ایجنت
         """
-        from hiddifypanel.models.admin import AdminMode
+        from hiddifypanel.models.admin import AdminUser, AdminMode
         
         agents = AdminUser.query.filter(
             AdminUser.mode == AdminMode.agent
@@ -92,6 +90,9 @@ class AgentTrafficCalculator:
         Returns:
             دیکشنری شامل آمار ترافیک
         """
+        from hiddifypanel.models.admin import AdminUser
+        from hiddifypanel.models.user import User
+        
         agent = AdminUser.query.get(agent_id)
         if not agent:
             return None
