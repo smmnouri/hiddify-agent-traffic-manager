@@ -110,8 +110,11 @@ def patch_adminstrator_admin(file_path):
             if stripped == '}' and i > form_overrides_start:
                 # Verify this is form_overrides by checking previous lines
                 # Should have 'parent_admin': SubAdminsField before this
-                prev_lines = '\n'.join(lines[form_overrides_start:i+1])
-                if "'parent_admin': SubAdminsField" in prev_lines:
+                # and should NOT have 'column_labels' after form_overrides_start
+                prev_section = '\n'.join(lines[form_overrides_start:i+1])
+                next_section = '\n'.join(lines[i+1:min(i+5, len(lines))])
+                if "'parent_admin': SubAdminsField" in prev_section and 'column_labels' not in prev_section:
+                    # Double check: the next non-empty line should be column_labels or something else, not another }
                     form_overrides_end = i
                     break
     
@@ -131,12 +134,12 @@ def patch_adminstrator_admin(file_path):
             content = '\n'.join(lines)
             print("Added TrafficLimitField to form_overrides")
     else:
-        # Fallback to regex - be more specific
-        form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})"
+        # Fallback to regex - be more specific, must have parent_admin and end before column_labels
+        form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})(\s*column_labels)"
         if re.search(form_overrides_pattern, content):
             content = re.sub(
                 form_overrides_pattern,
-                r"\1\n        'traffic_limit_GB': TrafficLimitField,",
+                r"\1\n        'traffic_limit_GB': TrafficLimitField,\n    }\2",
                 content
             )
             print("Added TrafficLimitField to form_overrides (regex fallback)")
