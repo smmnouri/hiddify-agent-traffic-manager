@@ -21,26 +21,48 @@ def patch_adminstrator_admin(file_path):
     
     # 1. Add import for TrafficLimitField at the top (after other imports)
     # Use try/except to handle import errors gracefully
-    if 'from hiddify_agent_traffic_manager.admin.agent_traffic_admin import TrafficLimitField' not in content:
-        # Try to find a good place to add the import - after the last import statement
+    if 'TrafficLimitField' not in content or ('from hiddify_agent_traffic_manager' not in content and 'TrafficLimitField =' not in content):
         lines = content.split('\n')
         import_added = False
         
-        # Find the last import line
-        for i in range(len(lines) - 1, -1, -1):
-            if lines[i].strip().startswith('import ') or lines[i].strip().startswith('from '):
+        # Find the last import line (after line with 'from hiddifypanel import hutils')
+        for i, line in enumerate(lines):
+            if 'from hiddifypanel import hutils' in line:
                 # Add import after this line
-                import_line = 'try:\n    from hiddify_agent_traffic_manager.admin.agent_traffic_admin import TrafficLimitField\nexcept ImportError:\n    # Fallback if module not available\n    from wtforms import DecimalField\n    TrafficLimitField = DecimalField'
-                lines.insert(i + 1, import_line)
+                import_lines = [
+                    '',
+                    'try:',
+                    '    from hiddify_agent_traffic_manager.admin.agent_traffic_admin import TrafficLimitField',
+                    'except ImportError:',
+                    '    # Fallback if module not available',
+                    '    from wtforms import DecimalField',
+                    '    TrafficLimitField = DecimalField',
+                    ''
+                ]
+                for j, import_line in enumerate(import_lines):
+                    lines.insert(i + 1 + j, import_line)
                 import_added = True
                 break
         
         if import_added:
             content = '\n'.join(lines)
         else:
-            # If no import found, add at the beginning after first non-empty line
-            first_line = content.split('\n')[0] if content else ''
-            content = first_line + '\n' + 'try:\n    from hiddify_agent_traffic_manager.admin.agent_traffic_admin import TrafficLimitField\nexcept ImportError:\n    # Fallback if module not available\n    from wtforms import DecimalField\n    TrafficLimitField = DecimalField\n' + content[len(first_line):]
+            # If hutils import not found, add after last import
+            for i in range(len(lines) - 1, -1, -1):
+                if lines[i].strip().startswith('import ') or lines[i].strip().startswith('from '):
+                    import_lines = [
+                        '',
+                        'try:',
+                        '    from hiddify_agent_traffic_manager.admin.agent_traffic_admin import TrafficLimitField',
+                        'except ImportError:',
+                        '    from wtforms import DecimalField',
+                        '    TrafficLimitField = DecimalField',
+                        ''
+                    ]
+                    for j, import_line in enumerate(import_lines):
+                        lines.insert(i + 1 + j, import_line)
+                    content = '\n'.join(lines)
+                    break
     
     # 2. Add traffic_limit_GB to form_columns (after max_active_users)
     form_columns_pattern = r"(form_columns = \[.*?'max_active_users', 'max_users',)(.*?\])"
