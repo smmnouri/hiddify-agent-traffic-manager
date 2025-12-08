@@ -131,6 +131,7 @@ def extend_admin_user_view(admin_view):
         logger.warning(f"Could not add column labels: {e}")
     
     # Add custom column formatters
+    # These functions are also exported for use in patched AdminstratorAdmin.py
     def _format_traffic_limit(view, context, model, name):
         """Format traffic limit column"""
         if model.mode != AdminMode.agent:

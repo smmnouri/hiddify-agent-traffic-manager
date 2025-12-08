@@ -110,29 +110,72 @@ echo -e "${BLUE}Patching panel/admin/AdminstratorAdmin.py...${NC}"
 # Backup
 cp "$ADMINSTRATOR_ADMIN_PY" "${ADMINSTRATOR_ADMIN_PY}.backup.$(date +%Y%m%d_%H%M%S)"
 
-# Check if already patched
-if grep -q "'traffic_limit_GB'" "$ADMINSTRATOR_ADMIN_PY"; then
-    echo -e "${YELLOW}Already patched (traffic_limit_GB in column_list)${NC}"
-else
-    # Add to column_list
-    if grep -q "column_list = \[" "$ADMINSTRATOR_ADMIN_PY"; then
-        # Find the line with column_list and add traffic columns before the closing bracket
-        sed -i "/column_list = \[/,/\]/ {
-            /'comment',/a\        'traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status',
-        }" "$ADMINSTRATOR_ADMIN_PY"
-        echo "Added traffic columns to column_list"
+# Use Python patch script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATCH_SCRIPT="$SCRIPT_DIR/patches/patch_adminstrator_admin.py"
+
+if [ -f "$PATCH_SCRIPT" ]; then
+    # Find Python
+    VENV_PYTHON=""
+    if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+        VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
+    elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
+        VENV_PYTHON="$HIDDIFY_DIR/.venv/bin/python"
+    else
+        VENV_PYTHON="python3"
     fi
     
-    # Add to form_columns
-    if grep -q "form_columns = \[" "$ADMINSTRATOR_ADMIN_PY"; then
-        sed -i "/form_columns = \[/,/\]/ {
-            /'max_users',/a\        'traffic_limit_GB',
-        }" "$ADMINSTRATOR_ADMIN_PY"
-        echo "Added traffic_limit_GB to form_columns"
+    echo "Using Python patch script..."
+    "$VENV_PYTHON" "$PATCH_SCRIPT" "$ADMINSTRATOR_ADMIN_PY"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ AdminstratorAdmin.py patched successfully${NC}"
+    else
+        echo -e "${YELLOW}⚠ Patch script completed with warnings (might already be patched)${NC}"
     fi
+else
+    echo -e "${YELLOW}⚠ Patch script not found, using basic sed method...${NC}"
+    # Fallback to basic sed method
+    if grep -q "'traffic_limit_GB'" "$ADMINSTRATOR_ADMIN_PY"; then
+        echo -e "${YELLOW}Already patched (traffic_limit_GB in column_list)${NC}"
+    else
+        # Add to column_list
+        if grep -q "column_list = \[" "$ADMINSTRATOR_ADMIN_PY"; then
+            sed -i "/column_list = \[/,/\]/ {
+                /'max_users',/a\        'traffic_limit_GB', 'total_traffic', 'remaining_traffic', 'traffic_status',
+            }" "$ADMINSTRATOR_ADMIN_PY"
+            echo "Added traffic columns to column_list"
+        fi
+        
+        # Add to form_columns
+        if grep -q "form_columns = \[" "$ADMINSTRATOR_ADMIN_PY"; then
+            sed -i "/form_columns = \[/,/\]/ {
+                /'max_users',/a\        'traffic_limit_GB',
+            }" "$ADMINSTRATOR_ADMIN_PY"
+            echo "Added traffic_limit_GB to form_columns"
+        fi
+    fi
+    echo -e "${GREEN}✓ AdminstratorAdmin.py patched${NC}"
 fi
 
-echo -e "${GREEN}✓ AdminstratorAdmin.py patched${NC}"
+echo ""
+
+# Step 3: Run database migration
+echo -e "${BLUE}Running database migration...${NC}"
+
+MIGRATION_SCRIPT="$SCRIPT_DIR/migrations/run_migration.sh"
+if [ -f "$MIGRATION_SCRIPT" ]; then
+    chmod +x "$MIGRATION_SCRIPT"
+    bash "$MIGRATION_SCRIPT"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Database migration completed${NC}"
+    else
+        echo -e "${YELLOW}⚠ Migration completed with warnings (column might already exist)${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠ Migration script not found, skipping...${NC}"
+fi
+
 echo ""
 
 echo -e "${GREEN}==========================================${NC}"
@@ -141,5 +184,5 @@ echo -e "${GREEN}==========================================${NC}"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Install from source: cd $SOURCE_DIR && /opt/hiddify-manager/.venv313/bin/pip install -e ."
-echo "2. Restart services: systemctl restart hiddify-panel"
+echo "2. Restart services: systemctl restart hiddify-panel hiddify-panel-background-tasks"
 

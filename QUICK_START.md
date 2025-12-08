@@ -17,7 +17,7 @@
 cd C:\Projects\vpn\hiddify-agent-traffic-manager
 
 # اضافه کردن remote (USERNAME را جایگزین کنید)
-git remote add origin https://github.com/USERNAME/hiddify-agent-traffic-manager.git
+git remote add origin https://github.com/smmnouri/hiddify-agent-traffic-manager.git
 
 # Push کردن
 git push -u origin main
@@ -26,20 +26,20 @@ git push -u origin main
 ## یا یک خطی:
 
 ```powershell
-cd C:\Projects\vpn\hiddify-agent-traffic-manager; git remote add origin https://github.com/USERNAME/hiddify-agent-traffic-manager.git; git push -u origin main
+cd C:\Projects\vpn\hiddify-agent-traffic-manager; git remote add origin https://github.com/smmnouri/hiddify-agent-traffic-manager.git; git push -u origin main
 ```
 
 ## اگر از SSH استفاده می‌کنید:
 
 ```powershell
-git remote add origin git@github.com:USERNAME/hiddify-agent-traffic-manager.git
+git remote add origin git@github.com:smmnouri/hiddify-agent-traffic-manager.git
 git push -u origin main
 ```
 
 ## بررسی
 
 بعد از push، به آدرس زیر بروید:
-`https://github.com/USERNAME/hiddify-agent-traffic-manager`
+`https://github.com/smmnouri/hiddify-agent-traffic-manager`
 
 تمام فایل‌ها باید نمایش داده شوند! ✅
 
