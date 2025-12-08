@@ -95,13 +95,34 @@ def patch_adminstrator_admin(file_path):
         )
     
     # 4. Add TrafficLimitField to form_overrides
-    form_overrides_pattern = r"(form_overrides = \{[^}]*'parent_admin': SubAdminsField\s*\n\s*\})"
-    if re.search(form_overrides_pattern, content):
-        content = re.sub(
-            form_overrides_pattern,
-            r"\1\n    'traffic_limit_GB': TrafficLimitField,",
-            content
-        )
+    # Use line-by-line approach to ensure correct placement
+    lines = content.split('\n')
+    form_overrides_found = False
+    form_overrides_end = -1
+    
+    for i, line in enumerate(lines):
+        if 'form_overrides = {' in line:
+            form_overrides_found = True
+        elif form_overrides_found and line.strip() == '}':
+            form_overrides_end = i
+            # Check if traffic_limit_GB is already there
+            form_overrides_section = '\n'.join(lines[lines.index([l for l in lines if 'form_overrides = {' in l][0]):i+1])
+            if "'traffic_limit_GB': TrafficLimitField" not in form_overrides_section:
+                # Insert before closing brace
+                lines.insert(i, "        'traffic_limit_GB': TrafficLimitField,")
+            break
+    
+    if form_overrides_end > 0:
+        content = '\n'.join(lines)
+    else:
+        # Fallback to regex if line-by-line didn't work
+        form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})"
+        if re.search(form_overrides_pattern, content):
+            content = re.sub(
+                form_overrides_pattern,
+                r"\1\n        'traffic_limit_GB': TrafficLimitField,",
+                content
+            )
     
     # 5. Add column labels
     column_labels_pattern = r"('can_add_admin': _\('Can add sub admin'\)\s*\n\s*\})"
