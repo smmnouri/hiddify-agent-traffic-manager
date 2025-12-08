@@ -113,7 +113,34 @@ fi
 echo "Using source directory: $SOURCE_DIR"
 echo ""
 
-# Step 2: Patch AdminstratorAdmin.py
+# Step 2: Patch base.py (initialize module)
+BASE_PY="$SOURCE_DIR/hiddifypanel/base.py"
+if [ ! -f "$BASE_PY" ]; then
+    # Try to find base.py
+    FOUND=$(find "$SOURCE_DIR" -name "base.py" -path "*/hiddifypanel/base.py" 2>/dev/null | head -n1)
+    if [ -n "$FOUND" ]; then
+        BASE_PY="$FOUND"
+    fi
+fi
+
+if [ -f "$BASE_PY" ]; then
+    echo "Patching base.py..."
+    cp "$BASE_PY" "${BASE_PY}.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    if [ -f "$SCRIPT_DIR/patches/patch_base.py" ]; then
+        "$VENV_PYTHON" "$SCRIPT_DIR/patches/patch_base.py" "$BASE_PY"
+        if [ $? -eq 0 ]; then
+            echo "✓ base.py patched"
+        else
+            echo "⚠ base.py patch had warnings"
+        fi
+    else
+        echo "⚠ patch_base.py not found, skipping base.py patch"
+    fi
+    echo ""
+fi
+
+# Step 3: Patch AdminstratorAdmin.py
 ADMINSTRATOR_ADMIN_PY="$SOURCE_DIR/hiddifypanel/panel/admin/AdminstratorAdmin.py"
 
 if [ ! -f "$ADMINSTRATOR_ADMIN_PY" ]; then
@@ -154,7 +181,7 @@ fi
 
 echo ""
 
-# Step 3: Run database migration
+# Step 4: Run database migration
 echo "Running database migration..."
 if [ -f "$SCRIPT_DIR/migrations/run_migration.sh" ]; then
     chmod +x "$SCRIPT_DIR/migrations/run_migration.sh"
@@ -166,7 +193,7 @@ fi
 
 echo ""
 
-# Step 4: Install from source (only if not pip-installed)
+# Step 5: Install from source (only if not pip-installed)
 if [[ "$SOURCE_DIR" != *"site-packages"* ]]; then
     echo "Installing from source..."
     SOURCE_PARENT="$(dirname "$SOURCE_DIR")"
@@ -200,7 +227,7 @@ fi
 
 echo ""
 
-# Step 5: Restart services
+# Step 6: Restart services
 echo "Restarting services..."
 systemctl restart hiddify-panel hiddify-panel-background-tasks
 echo "✓ Services restarted"
