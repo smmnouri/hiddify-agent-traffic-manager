@@ -186,7 +186,7 @@ def patch_adminstrator_admin(file_path):
         lines = content.split('\n')
         formatter_indent = '    '  # Default: 4 spaces (class method level)
         for i, line in enumerate(lines):
-            if 'def _' in line and 'formatter' in line.lower():
+            if 'def _' in line and ('formatter' in line.lower() or '_ul_formatter' in line or '_name_formatter' in line):
                 # Get indentation from existing formatter
                 formatter_indent = ' ' * (len(line) - len(line.lstrip()))
                 break
