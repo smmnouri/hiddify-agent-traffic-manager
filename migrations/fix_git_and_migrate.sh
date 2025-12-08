@@ -9,6 +9,9 @@ echo "Fixing git issues..."
 # Stash local changes
 git stash
 
+# Remove untracked files that might conflict
+rm -f migrations/fix_git_and_migrate.sh
+
 # Pull latest changes
 git pull
 
