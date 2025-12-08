@@ -64,45 +64,94 @@ fi
 echo -e "${GREEN}Using source directory: $SOURCE_DIR${NC}"
 echo ""
 
+# Verify source directory structure
+echo -e "${BLUE}Checking source directory structure...${NC}"
+if [ ! -d "$SOURCE_DIR/hiddifypanel" ]; then
+    echo -e "${YELLOW}Warning: hiddifypanel directory not found in $SOURCE_DIR${NC}"
+    echo -e "${YELLOW}Listing contents of $SOURCE_DIR:${NC}"
+    ls -la "$SOURCE_DIR" | head -20
+    echo ""
+    
+    # Try to find hiddifypanel directory
+    FOUND_HIDDIFY=$(find "$SOURCE_DIR" -type d -name "hiddifypanel" 2>/dev/null | head -n1)
+    if [ -n "$FOUND_HIDDIFY" ]; then
+        echo -e "${GREEN}Found hiddifypanel at: $FOUND_HIDDIFY${NC}"
+        # Adjust SOURCE_DIR to parent of hiddifypanel
+        SOURCE_DIR="$(dirname "$FOUND_HIDDIFY")"
+        echo -e "${GREEN}Adjusted source directory to: $SOURCE_DIR${NC}"
+    else
+        echo -e "${RED}✗ Could not find hiddifypanel directory${NC}"
+        exit 1
+    fi
+fi
+
 # Patch 1: models/admin.py
 ADMIN_PY="$SOURCE_DIR/hiddifypanel/models/admin.py"
 if [ ! -f "$ADMIN_PY" ]; then
-    echo -e "${RED}✗ $ADMIN_PY not found${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠ $ADMIN_PY not found, searching...${NC}"
+    # Try to find admin.py
+    FOUND_ADMIN=$(find "$SOURCE_DIR" -name "admin.py" -path "*/models/admin.py" 2>/dev/null | head -n1)
+    if [ -n "$FOUND_ADMIN" ]; then
+        ADMIN_PY="$FOUND_ADMIN"
+        echo -e "${GREEN}Found admin.py at: $ADMIN_PY${NC}"
+    else
+        echo -e "${RED}✗ admin.py not found in expected location${NC}"
+        echo -e "${YELLOW}Searching for models directory...${NC}"
+        find "$SOURCE_DIR" -type d -name "models" 2>/dev/null | head -5
+        echo ""
+        echo -e "${YELLOW}Note: This patch is optional if traffic_limit column is already in the model${NC}"
+        echo -e "${YELLOW}Continuing with AdminstratorAdmin.py patch...${NC}"
+        ADMIN_PY=""
+    fi
 fi
 
-echo -e "${BLUE}Patching models/admin.py...${NC}"
-
-# Backup
-cp "$ADMIN_PY" "${ADMIN_PY}.backup.$(date +%Y%m%d_%H%M%S)"
-
-# Check if already patched
-if grep -q "traffic_limit = Column(BigInteger" "$ADMIN_PY"; then
-    echo -e "${YELLOW}Already patched (traffic_limit column exists)${NC}"
-else
-    # Add BigInteger import if needed
-    if ! grep -q "from sqlalchemy import.*BigInteger" "$ADMIN_PY"; then
-        sed -i 's/from sqlalchemy import/from sqlalchemy import BigInteger,/' "$ADMIN_PY"
-        echo "Added BigInteger to imports"
+if [ -n "$ADMIN_PY" ] && [ -f "$ADMIN_PY" ]; then
+    echo -e "${BLUE}Patching models/admin.py...${NC}"
+    
+    # Backup
+    cp "$ADMIN_PY" "${ADMIN_PY}.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # Check if already patched
+    if grep -q "traffic_limit = Column(BigInteger" "$ADMIN_PY"; then
+        echo -e "${YELLOW}Already patched (traffic_limit column exists)${NC}"
+    else
+        # Add BigInteger import if needed
+        if ! grep -q "from sqlalchemy import.*BigInteger" "$ADMIN_PY"; then
+            sed -i 's/from sqlalchemy import/from sqlalchemy import BigInteger,/' "$ADMIN_PY"
+            echo "Added BigInteger to imports"
+        fi
+        
+        # Add traffic_limit column after max_active_users
+        if grep -q "max_active_users = Column(Integer, default=100, nullable=False)" "$ADMIN_PY"; then
+            sed -i '/max_active_users = Column(Integer, default=100, nullable=False)/a\    traffic_limit = Column(BigInteger, default=None, nullable=True)' "$ADMIN_PY"
+            echo "Added traffic_limit column"
+        else
+            echo -e "${YELLOW}Could not find insertion point for traffic_limit${NC}"
+        fi
     fi
     
-    # Add traffic_limit column after max_active_users
-    if grep -q "max_active_users = Column(Integer, default=100, nullable=False)" "$ADMIN_PY"; then
-        sed -i '/max_active_users = Column(Integer, default=100, nullable=False)/a\    traffic_limit = Column(BigInteger, default=None, nullable=True)' "$ADMIN_PY"
-        echo "Added traffic_limit column"
-    else
-        echo -e "${YELLOW}Could not find insertion point for traffic_limit${NC}"
-    fi
+    echo -e "${GREEN}✓ models/admin.py patched${NC}"
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Skipping models/admin.py patch (file not found or already handled by migration)${NC}"
+    echo ""
 fi
-
-echo -e "${GREEN}✓ models/admin.py patched${NC}"
-echo ""
 
 # Patch 2: panel/admin/AdminstratorAdmin.py
 ADMINSTRATOR_ADMIN_PY="$SOURCE_DIR/hiddifypanel/panel/admin/AdminstratorAdmin.py"
 if [ ! -f "$ADMINSTRATOR_ADMIN_PY" ]; then
-    echo -e "${RED}✗ $ADMINSTRATOR_ADMIN_PY not found${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠ $ADMINSTRATOR_ADMIN_PY not found, searching...${NC}"
+    # Try to find AdminstratorAdmin.py
+    FOUND_ADMINSTRATOR=$(find "$SOURCE_DIR" -name "AdminstratorAdmin.py" 2>/dev/null | head -n1)
+    if [ -n "$FOUND_ADMINSTRATOR" ]; then
+        ADMINSTRATOR_ADMIN_PY="$FOUND_ADMINSTRATOR"
+        echo -e "${GREEN}Found AdminstratorAdmin.py at: $ADMINSTRATOR_ADMIN_PY${NC}"
+    else
+        echo -e "${RED}✗ AdminstratorAdmin.py not found${NC}"
+        echo -e "${YELLOW}Searching for admin directory...${NC}"
+        find "$SOURCE_DIR" -type d -name "admin" 2>/dev/null | head -5
+        exit 1
+    fi
 fi
 
 echo -e "${BLUE}Patching panel/admin/AdminstratorAdmin.py...${NC}"
