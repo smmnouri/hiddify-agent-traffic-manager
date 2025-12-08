@@ -106,7 +106,17 @@ except RuntimeError as e:
                 print("Connecting to database directly...")
                 from sqlalchemy import create_engine, inspect, text
                 engine = create_engine(db_uri)
+                
+                # Check if table exists first
                 inspector = inspect(engine)
+                tables = inspector.get_table_names()
+                
+                if 'admin_user' not in tables:
+                    print("⚠ admin_user table does not exist. Database might not be initialized.")
+                    print(f"   Available tables: {', '.join(tables[:5])}")
+                    print("   Skipping migration - will be done when database is initialized")
+                    sys.exit(0)
+                
                 columns = [col['name'] for col in inspector.get_columns('admin_user')]
                 if 'traffic_limit' not in columns:
                     print("Adding traffic_limit column...")
@@ -119,8 +129,10 @@ except RuntimeError as e:
                 sys.exit(0)
             except Exception as e4:
                 print(f"⚠ Direct connection failed: {e4}")
-                import traceback
-                traceback.print_exc()
+                # Don't print full traceback for common errors
+                if "no such table" not in str(e4).lower():
+                    import traceback
+                    traceback.print_exc()
         
         print("Trying direct database access...")
     else:

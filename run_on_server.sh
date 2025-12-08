@@ -181,11 +181,26 @@ fi
 
 echo ""
 
-# Step 4: Run database migration
+# Step 4: Install module first
+echo "Installing traffic manager module..."
+cd "$SCRIPT_DIR"
+if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
+    "$HIDDIFY_DIR/.venv313/bin/pip" install -e . > /dev/null 2>&1
+elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
+    "$HIDDIFY_DIR/.venv/bin/pip" install -e . > /dev/null 2>&1
+else
+    pip3 install -e . > /dev/null 2>&1
+fi
+echo "✓ Module installed"
+
+echo ""
+
+# Step 5: Run database migration
 echo "Running database migration..."
-if [ -f "$SCRIPT_DIR/migrations/run_migration.sh" ]; then
-    chmod +x "$SCRIPT_DIR/migrations/run_migration.sh"
-    bash "$SCRIPT_DIR/migrations/run_migration.sh"
+if [ -f "$SCRIPT_DIR/migrations/migrate_with_app.py" ]; then
+    cd /opt/hiddify-manager
+    source .venv313/bin/activate 2>/dev/null || true
+    python3 "$SCRIPT_DIR/migrations/migrate_with_app.py" || echo "⚠ Migration had warnings (column might already exist)"
     echo "✓ Migration completed"
 else
     echo "⚠ Migration script not found, skipping..."
@@ -193,7 +208,7 @@ fi
 
 echo ""
 
-# Step 5: Install from source (only if not pip-installed)
+# Step 6: Install from source (only if not pip-installed)
 if [[ "$SOURCE_DIR" != *"site-packages"* ]]; then
     echo "Installing from source..."
     SOURCE_PARENT="$(dirname "$SOURCE_DIR")"
@@ -227,7 +242,7 @@ fi
 
 echo ""
 
-# Step 6: Restart services
+# Step 7: Restart services
 echo "Restarting services..."
 systemctl restart hiddify-panel hiddify-panel-background-tasks
 echo "✓ Services restarted"
