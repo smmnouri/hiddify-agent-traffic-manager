@@ -25,32 +25,43 @@ fi
 echo "Found base.py: $BASE_PY"
 echo ""
 
-# Check for backup
-BACKUP=$(ls -t "${BASE_PY}.backup."* 2>/dev/null | head -n1)
-if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
-    echo "Restoring from backup: $BACKUP"
-    cp "$BACKUP" "$BASE_PY"
-    echo "✓ Restored"
-else
-    echo "⚠ No backup found, trying to remove patches..."
-    cd "$HIDDIFY_DIR/hiddify-agent-traffic-manager"
-    if [ -f "patches/unpatch_base.py" ]; then
-        VENV_PYTHON=""
-        if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
-            VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
-        else
-            VENV_PYTHON="python3"
-        fi
-        "$VENV_PYTHON" patches/unpatch_base.py "$BASE_PY" 2>/dev/null || true
-    fi
-    
-    # Check syntax
-    python3 -m py_compile "$BASE_PY" 2>&1
+# Restore base.py first
+echo "Restoring base.py..."
+cd "$HIDDIFY_DIR/hiddify-agent-traffic-manager"
+if [ -f "restore_base_py.sh" ]; then
+    bash restore_base_py.sh
     if [ $? -ne 0 ]; then
-        echo "✗ File still has syntax errors"
+        echo "⚠ Restore script failed, trying manual restore..."
+        # Try backup
+        BACKUP=$(ls -t "${BASE_PY}.backup."* 2>/dev/null | head -n1)
+        if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
+            cp "$BACKUP" "$BASE_PY"
+            echo "✓ Restored from backup"
+        else
+            echo "✗ No backup found"
+            exit 1
+        fi
+    fi
+else
+    # Fallback to backup
+    BACKUP=$(ls -t "${BASE_PY}.backup."* 2>/dev/null | head -n1)
+    if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
+        cp "$BACKUP" "$BASE_PY"
+        echo "✓ Restored from backup"
+    else
+        echo "✗ No backup found and restore script not available"
         exit 1
     fi
 fi
+
+# Verify syntax after restore
+echo "Verifying syntax after restore..."
+python3 -m py_compile "$BASE_PY" 2>&1
+if [ $? -ne 0 ]; then
+    echo "✗ File still has syntax errors after restore"
+    exit 1
+fi
+echo "✓ Syntax OK after restore"
 
 # Re-patch with corrected script
 echo ""
