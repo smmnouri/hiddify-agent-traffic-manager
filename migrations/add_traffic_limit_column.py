@@ -40,11 +40,31 @@ def migrate():
             logger.debug("traffic_limit column already exists")
             return True
     except Exception as e:
-        from loguru import logger
-        logger.error(f"Error adding traffic_limit column: {e}")
-        import traceback
-        logger.debug(traceback.format_exc())
-        return False
+        # Try without app context - direct database access
+        try:
+            from hiddifypanel.database import db
+            # Try to get engine directly
+            if hasattr(db, 'engine') and db.engine:
+                from sqlalchemy import inspect
+                inspector = inspect(db.engine)
+                columns = [col['name'] for col in inspector.get_columns('admin_user')]
+                
+                if 'traffic_limit' not in columns:
+                    print("Adding traffic_limit column (direct method)...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+                        conn.commit()
+                    print("✓ Success: traffic_limit column added")
+                    return True
+                else:
+                    print("✓ Info: traffic_limit column already exists")
+                    return True
+        except Exception as e2:
+            from loguru import logger
+            logger.error(f"Error adding traffic_limit column: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return False
 
 if __name__ == '__main__':
     # Try to get app context
