@@ -74,16 +74,37 @@ else
             echo "Cloning HiddifyPanel from GitHub..."
             git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source
             
-            if [ $? -eq 0 ] && [ -d "hiddify-panel-source/src" ] && [ "$(ls -A hiddify-panel-source/src 2>/dev/null)" ]; then
+            if [ $? -ne 0 ]; then
+                echo "✗ Failed to clone HiddifyPanel"
+                exit 1
+            fi
+            
+            # Check different possible structures
+            if [ -d "hiddify-panel-source/src" ] && [ "$(ls -A hiddify-panel-source/src 2>/dev/null)" ]; then
                 SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-source/src"
                 echo "✓ Successfully cloned and found source: $SOURCE_DIR"
+            elif [ -d "hiddify-panel-source/hiddifypanel" ] && [ "$(ls -A hiddify-panel-source/hiddifypanel 2>/dev/null)" ]; then
+                # Maybe hiddifypanel is directly in root
+                SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-source"
+                echo "✓ Found hiddifypanel in root: $SOURCE_DIR"
             else
-                echo "✗ Failed to clone or source directory is empty"
+                echo "⚠ Checking cloned directory structure..."
+                echo "Contents of hiddify-panel-source:"
+                ls -la hiddify-panel-source/ | head -10
                 echo ""
-                echo "Please clone manually:"
-                echo "  cd $HIDDIFY_DIR"
-                echo "  git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
-                exit 1
+                
+                # Try to find hiddifypanel directory
+                FOUND=$(find hiddify-panel-source -type d -name "hiddifypanel" 2>/dev/null | head -n1)
+                if [ -n "$FOUND" ]; then
+                    SOURCE_DIR="$(dirname "$FOUND")"
+                    echo "✓ Found hiddifypanel at: $FOUND"
+                    echo "✓ Using source directory: $SOURCE_DIR"
+                else
+                    echo "✗ Could not find hiddifypanel directory in cloned repository"
+                    echo ""
+                    echo "Please check the repository structure manually"
+                    exit 1
+                fi
             fi
         fi
     fi
