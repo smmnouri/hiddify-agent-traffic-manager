@@ -124,18 +124,34 @@ def patch_adminstrator_admin(file_path):
         if "'traffic_limit_GB': TrafficLimitField" not in form_overrides_section:
             # Get indentation from 'parent_admin' line
             indent = ' ' * 8  # Default indentation
+            parent_admin_line_idx = -1
             for j in range(form_overrides_start, form_overrides_end):
                 if "'parent_admin': SubAdminsField" in lines[j]:
                     # Get indentation from this line
                     indent = ' ' * (len(lines[j]) - len(lines[j].lstrip()))
+                    parent_admin_line_idx = j
                     break
+            
+            # Check if parent_admin line has a comma at the end
+            if parent_admin_line_idx >= 0:
+                parent_line = lines[parent_admin_line_idx].rstrip()
+                if not parent_line.endswith(','):
+                    # Add comma to parent_admin line
+                    lines[parent_admin_line_idx] = parent_line + ','
+            
             # Insert before closing brace with correct indentation
             lines.insert(form_overrides_end, f"{indent}'traffic_limit_GB': TrafficLimitField,")
             content = '\n'.join(lines)
             print("Added TrafficLimitField to form_overrides")
     else:
         # Fallback to regex - be more specific, must have parent_admin and end before column_labels
-        form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})(\s*column_labels)"
+        # First ensure parent_admin has a comma
+        content = re.sub(
+            r"('parent_admin': SubAdminsField)(\s*\n\s*\})",
+            r"\1,\2",
+            content
+        )
+        form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField,\s*\n\s*\})(\s*column_labels)"
         if re.search(form_overrides_pattern, content):
             content = re.sub(
                 form_overrides_pattern,
