@@ -97,25 +97,28 @@ def patch_adminstrator_admin(file_path):
     # 4. Add TrafficLimitField to form_overrides
     # Use line-by-line approach to ensure correct placement
     lines = content.split('\n')
-    form_overrides_found = False
+    form_overrides_start = -1
     form_overrides_end = -1
     
+    # Find form_overrides block
     for i, line in enumerate(lines):
         if 'form_overrides = {' in line:
-            form_overrides_found = True
-        elif form_overrides_found and line.strip() == '}':
+            form_overrides_start = i
+        elif form_overrides_start >= 0 and line.strip() == '}' and i > form_overrides_start:
             form_overrides_end = i
-            # Check if traffic_limit_GB is already there
-            form_overrides_section = '\n'.join(lines[lines.index([l for l in lines if 'form_overrides = {' in l][0]):i+1])
-            if "'traffic_limit_GB': TrafficLimitField" not in form_overrides_section:
-                # Insert before closing brace
-                lines.insert(i, "        'traffic_limit_GB': TrafficLimitField,")
             break
     
-    if form_overrides_end > 0:
-        content = '\n'.join(lines)
+    if form_overrides_start >= 0 and form_overrides_end > form_overrides_start:
+        # Check if already added
+        form_overrides_section = '\n'.join(lines[form_overrides_start:form_overrides_end+1])
+        if "'traffic_limit_GB': TrafficLimitField" not in form_overrides_section:
+            # Insert before closing brace with correct indentation
+            indent = ' ' * 8  # Match the indentation of other entries
+            lines.insert(form_overrides_end, f"{indent}'traffic_limit_GB': TrafficLimitField,")
+            content = '\n'.join(lines)
+            print("Added TrafficLimitField to form_overrides")
     else:
-        # Fallback to regex if line-by-line didn't work
+        # Fallback to regex
         form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})"
         if re.search(form_overrides_pattern, content):
             content = re.sub(
@@ -123,6 +126,7 @@ def patch_adminstrator_admin(file_path):
                 r"\1\n        'traffic_limit_GB': TrafficLimitField,",
                 content
             )
+            print("Added TrafficLimitField to form_overrides (regex fallback)")
     
     # 5. Add column labels
     column_labels_pattern = r"('can_add_admin': _\('Can add sub admin'\)\s*\n\s*\})"
