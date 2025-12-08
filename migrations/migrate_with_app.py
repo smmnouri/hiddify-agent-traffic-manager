@@ -68,28 +68,60 @@ except RuntimeError as e:
     if "SQLALCHEMY_DATABASE_URI" in str(e):
         print("⚠ App initialization failed (config issue). Trying to read database URI from app.cfg...")
         # Try to read SQLALCHEMY_DATABASE_URI from app.cfg
+        db_uri = None
         if app_cfg:
             try:
+                print(f"Reading app.cfg: {app_cfg}")
                 with open(app_cfg, 'r') as f:
-                    for line in f:
-                        if 'SQLALCHEMY_DATABASE_URI' in line:
-                            db_uri = line.split('=')[1].strip().strip("'\"")
-                            print(f"Found database URI in app.cfg")
-                            # Try to use it directly
-                            from sqlalchemy import create_engine, inspect, text
-                            engine = create_engine(db_uri)
-                            inspector = inspect(engine)
-                            columns = [col['name'] for col in inspector.get_columns('admin_user')]
-                            if 'traffic_limit' not in columns:
-                                with engine.connect() as conn:
-                                    conn.execute(text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
-                                    conn.commit()
-                                print("✓ Column added successfully (direct connection)")
-                            else:
-                                print("✓ Column already exists")
-                            sys.exit(0)
+                    content = f.read()
+                    # Look for SQLALCHEMY_DATABASE_URI
+                    for line in content.split('\n'):
+                        line = line.strip()
+                        if line.startswith('SQLALCHEMY_DATABASE_URI'):
+                            # Handle different formats: SQLALCHEMY_DATABASE_URI ='...' or SQLALCHEMY_DATABASE_URI='...'
+                            if '=' in line:
+                                db_uri = line.split('=', 1)[1].strip().strip("'\"")
+                                print(f"✓ Found database URI in app.cfg")
+                                break
             except Exception as e2:
                 print(f"⚠ Could not read app.cfg: {e2}")
+        
+        # If not found in app.cfg, try to read from environment or construct from MySQL password
+        if not db_uri:
+            db_uri = os.getenv('SQLALCHEMY_DATABASE_URI')
+            if not db_uri:
+                # Try to read MySQL password and construct URI
+                mysql_pass_file = f'{HIDDIFY_DIR}/other/mysql/mysql_pass'
+                if os.path.exists(mysql_pass_file):
+                    try:
+                        with open(mysql_pass_file, 'r') as f:
+                            mysql_pass = f.read().strip()
+                        db_uri = f"mysql+mysqldb://hiddifypanel:{mysql_pass}@localhost/hiddifypanel?charset=utf8mb4"
+                        print(f"✓ Constructed database URI from MySQL password file")
+                    except Exception as e3:
+                        print(f"⚠ Could not read MySQL password: {e3}")
+        
+        if db_uri:
+            try:
+                print("Connecting to database directly...")
+                from sqlalchemy import create_engine, inspect, text
+                engine = create_engine(db_uri)
+                inspector = inspect(engine)
+                columns = [col['name'] for col in inspector.get_columns('admin_user')]
+                if 'traffic_limit' not in columns:
+                    print("Adding traffic_limit column...")
+                    with engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+                        conn.commit()
+                    print("✓ Column added successfully (direct connection)")
+                else:
+                    print("✓ Column already exists")
+                sys.exit(0)
+            except Exception as e4:
+                print(f"⚠ Direct connection failed: {e4}")
+                import traceback
+                traceback.print_exc()
+        
         print("Trying direct database access...")
     else:
         raise
