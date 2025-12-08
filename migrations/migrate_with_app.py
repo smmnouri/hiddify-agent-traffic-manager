@@ -7,6 +7,23 @@ import os
 
 # Try to find and set config path
 HIDDIFY_DIR = os.getenv('HIDDIFY_DIR', '/opt/hiddify-manager')
+
+# Find app.cfg file
+app_cfg_paths = [
+    f'{HIDDIFY_DIR}/hiddify-panel/app.cfg',
+    f'{HIDDIFY_DIR}/hiddify-panel-custom/app.cfg',
+    f'{HIDDIFY_DIR}/hiddify-panel-source/app.cfg',
+]
+
+app_cfg = None
+for path in app_cfg_paths:
+    if os.path.exists(path):
+        app_cfg = path
+        os.environ['HIDDIFY_CFG_PATH'] = path
+        print(f"Found app.cfg: {path}")
+        break
+
+# Also set config path
 config_paths = [
     f'{HIDDIFY_DIR}/config',
     '/opt/hiddify/config',
@@ -27,6 +44,12 @@ try:
     from sqlalchemy import inspect
     
     print("Initializing HiddifyPanel app...")
+    
+    # If app.cfg found, make sure we're in the right directory
+    if app_cfg:
+        os.chdir(os.path.dirname(app_cfg))
+        print(f"Changed to directory: {os.getcwd()}")
+    
     app = create_app()
     with app.app_context():
         inspector = inspect(db.engine)
@@ -43,7 +66,31 @@ try:
         sys.exit(0)
 except RuntimeError as e:
     if "SQLALCHEMY_DATABASE_URI" in str(e):
-        print("⚠ App initialization failed (config issue). Trying direct database access...")
+        print("⚠ App initialization failed (config issue). Trying to read database URI from app.cfg...")
+        # Try to read SQLALCHEMY_DATABASE_URI from app.cfg
+        if app_cfg:
+            try:
+                with open(app_cfg, 'r') as f:
+                    for line in f:
+                        if 'SQLALCHEMY_DATABASE_URI' in line:
+                            db_uri = line.split('=')[1].strip().strip("'\"")
+                            print(f"Found database URI in app.cfg")
+                            # Try to use it directly
+                            from sqlalchemy import create_engine, inspect, text
+                            engine = create_engine(db_uri)
+                            inspector = inspect(engine)
+                            columns = [col['name'] for col in inspector.get_columns('admin_user')]
+                            if 'traffic_limit' not in columns:
+                                with engine.connect() as conn:
+                                    conn.execute(text("ALTER TABLE admin_user ADD COLUMN traffic_limit BIGINT DEFAULT NULL"))
+                                    conn.commit()
+                                print("✓ Column added successfully (direct connection)")
+                            else:
+                                print("✓ Column already exists")
+                            sys.exit(0)
+            except Exception as e2:
+                print(f"⚠ Could not read app.cfg: {e2}")
+        print("Trying direct database access...")
     else:
         raise
 except Exception as e:
