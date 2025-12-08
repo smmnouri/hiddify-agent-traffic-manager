@@ -100,25 +100,38 @@ def patch_adminstrator_admin(file_path):
     form_overrides_start = -1
     form_overrides_end = -1
     
-    # Find form_overrides block
+    # Find form_overrides block - look for the exact pattern
     for i, line in enumerate(lines):
         if 'form_overrides = {' in line:
             form_overrides_start = i
-        elif form_overrides_start >= 0 and line.strip() == '}' and i > form_overrides_start:
-            form_overrides_end = i
-            break
+        elif form_overrides_start >= 0:
+            # Check if this is the closing brace of form_overrides
+            stripped = line.strip()
+            if stripped == '}' and i > form_overrides_start:
+                # Verify this is form_overrides by checking previous lines
+                # Should have 'parent_admin': SubAdminsField before this
+                prev_lines = '\n'.join(lines[form_overrides_start:i+1])
+                if "'parent_admin': SubAdminsField" in prev_lines:
+                    form_overrides_end = i
+                    break
     
     if form_overrides_start >= 0 and form_overrides_end > form_overrides_start:
         # Check if already added
         form_overrides_section = '\n'.join(lines[form_overrides_start:form_overrides_end+1])
         if "'traffic_limit_GB': TrafficLimitField" not in form_overrides_section:
+            # Get indentation from 'parent_admin' line
+            indent = ' ' * 8  # Default indentation
+            for j in range(form_overrides_start, form_overrides_end):
+                if "'parent_admin': SubAdminsField" in lines[j]:
+                    # Get indentation from this line
+                    indent = ' ' * (len(lines[j]) - len(lines[j].lstrip()))
+                    break
             # Insert before closing brace with correct indentation
-            indent = ' ' * 8  # Match the indentation of other entries
             lines.insert(form_overrides_end, f"{indent}'traffic_limit_GB': TrafficLimitField,")
             content = '\n'.join(lines)
             print("Added TrafficLimitField to form_overrides")
     else:
-        # Fallback to regex
+        # Fallback to regex - be more specific
         form_overrides_pattern = r"(form_overrides = \{[\s\S]*?'parent_admin': SubAdminsField\s*\n\s*\})"
         if re.search(form_overrides_pattern, content):
             content = re.sub(
