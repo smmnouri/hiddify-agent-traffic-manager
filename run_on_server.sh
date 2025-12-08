@@ -15,16 +15,54 @@ SCRIPT_DIR="$HIDDIFY_DIR/hiddify-agent-traffic-manager"
 # Step 1: Find source directory
 SOURCE_DIR=""
 
+# Check multiple locations
 if [ -d "$HIDDIFY_DIR/hiddify-panel-source/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-source/src 2>/dev/null)" ]; then
     SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-source/src"
     echo "✓ Found source in hiddify-panel-source"
 elif [ -d "$HIDDIFY_DIR/hiddify-panel-custom/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel-custom/src 2>/dev/null)" ]; then
     SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel-custom/src"
     echo "✓ Found source in hiddify-panel-custom"
+elif [ -d "$HIDDIFY_DIR/hiddify-panel/src" ] && [ "$(ls -A $HIDDIFY_DIR/hiddify-panel/src 2>/dev/null)" ]; then
+    SOURCE_DIR="$HIDDIFY_DIR/hiddify-panel/src"
+    echo "✓ Found source in hiddify-panel"
 else
-    echo "✗ Source directory not found"
-    echo "Please make sure hiddify-panel-source is cloned"
-    exit 1
+    # Try to find hiddifypanel directory anywhere
+    echo "Searching for hiddifypanel directory..."
+    FOUND=$(find "$HIDDIFY_DIR" -type d -name "hiddifypanel" -path "*/src/hiddifypanel" 2>/dev/null | head -n1)
+    if [ -n "$FOUND" ]; then
+        SOURCE_DIR="$(dirname "$FOUND")"
+        echo "✓ Found source via search: $SOURCE_DIR"
+    else
+        # Check if installed via pip
+        echo "Checking pip installation..."
+        VENV_PYTHON=""
+        if [ -f "$HIDDIFY_DIR/.venv313/bin/python" ]; then
+            VENV_PYTHON="$HIDDIFY_DIR/.venv313/bin/python"
+        elif [ -f "$HIDDIFY_DIR/.venv/bin/python" ]; then
+            VENV_PYTHON="$HIDDIFY_DIR/.venv/bin/python"
+        else
+            VENV_PYTHON="python3"
+        fi
+        
+        if [ -n "$VENV_PYTHON" ]; then
+            SITE_PACKAGES=$("$VENV_PYTHON" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null || echo "")
+            if [ -n "$SITE_PACKAGES" ] && [ -d "$SITE_PACKAGES/hiddifypanel" ]; then
+                SOURCE_DIR="$SITE_PACKAGES"
+                echo "✓ Found pip installation in: $SOURCE_DIR"
+            fi
+        fi
+        
+        if [ -z "$SOURCE_DIR" ]; then
+            echo "✗ Source directory not found"
+            echo ""
+            echo "Please clone HiddifyPanel first:"
+            echo "  cd $HIDDIFY_DIR"
+            echo "  git clone https://github.com/hiddify/hiddify-panel.git hiddify-panel-source"
+            echo ""
+            echo "Or if you want to patch the installed package, make sure HiddifyPanel is installed via pip"
+            exit 1
+        fi
+    fi
 fi
 
 echo "Using source directory: $SOURCE_DIR"
@@ -83,24 +121,37 @@ fi
 
 echo ""
 
-# Step 4: Install from source
-echo "Installing from source..."
-cd "$(dirname "$SOURCE_DIR")"
-
-# Find pip
-PIP_CMD=""
-if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
-    PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
-elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
-    PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
-elif command -v pip3 &> /dev/null; then
-    PIP_CMD="pip3"
+# Step 4: Install from source (only if not pip-installed)
+if [[ "$SOURCE_DIR" != *"site-packages"* ]]; then
+    echo "Installing from source..."
+    SOURCE_PARENT="$(dirname "$SOURCE_DIR")"
+    
+    # Check if it's a git repository
+    if [ -d "$SOURCE_PARENT/.git" ] || [ -f "$SOURCE_PARENT/setup.py" ] || [ -f "$SOURCE_PARENT/pyproject.toml" ]; then
+        cd "$SOURCE_PARENT"
+        
+        # Find pip
+        PIP_CMD=""
+        if [ -f "$HIDDIFY_DIR/.venv313/bin/pip" ]; then
+            PIP_CMD="$HIDDIFY_DIR/.venv313/bin/pip"
+        elif [ -f "$HIDDIFY_DIR/.venv/bin/pip" ]; then
+            PIP_CMD="$HIDDIFY_DIR/.venv/bin/pip"
+        elif command -v pip3 &> /dev/null; then
+            PIP_CMD="pip3"
+        else
+            PIP_CMD="python3 -m pip"
+        fi
+        
+        "$PIP_CMD" install -e .
+        echo "✓ Installed from source"
+    else
+        echo "⚠ Not a git repository or source package, skipping installation"
+        echo "  (If patching pip-installed package, this is normal)"
+    fi
 else
-    PIP_CMD="python3 -m pip"
+    echo "⚠ Patching pip-installed package (changes will be lost on upgrade)"
+    echo "  Consider installing from source for permanent changes"
 fi
-
-"$PIP_CMD" install -e .
-echo "✓ Installed from source"
 
 echo ""
 
