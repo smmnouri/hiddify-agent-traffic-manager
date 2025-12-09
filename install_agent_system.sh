@@ -20,42 +20,111 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Find HiddifyPanel directory
-HIDDIFY_DIR="/opt/hiddify-manager/hiddify-panel"
-if [ ! -d "$HIDDIFY_DIR" ]; then
-    echo -e "${RED}HiddifyPanel directory not found at $HIDDIFY_DIR${NC}"
+HIDDIFY_DIR=""
+
+# Try to find from systemd service
+if [ -f "/etc/systemd/system/hiddify-panel.service" ]; then
+    WORKING_DIR=$(grep "^WorkingDirectory=" /etc/systemd/system/hiddify-panel.service | cut -d'=' -f2 | tr -d ' ')
+    if [ -n "$WORKING_DIR" ] && [ -d "$WORKING_DIR" ]; then
+        HIDDIFY_DIR="$WORKING_DIR"
+    fi
+fi
+
+# Try common paths
+if [ -z "$HIDDIFY_DIR" ]; then
+    for path in "/opt/hiddify-manager/hiddify-panel" "/opt/hiddify/hiddify-panel" "/usr/local/hiddify-panel"; do
+        if [ -d "$path" ] && [ -f "$path/app.py" ]; then
+            HIDDIFY_DIR="$path"
+            break
+        fi
+    done
+fi
+
+# Try to find from Python package location
+if [ -z "$HIDDIFY_DIR" ]; then
+    PYTHON_PATH=$(python3 -c "import hiddifypanel; import os; print(os.path.dirname(os.path.dirname(hiddifypanel.__file__)))" 2>/dev/null || echo "")
+    if [ -n "$PYTHON_PATH" ] && [ -d "$PYTHON_PATH" ] && [ -f "$PYTHON_PATH/app.py" ]; then
+        HIDDIFY_DIR="$PYTHON_PATH"
+    fi
+fi
+
+if [ -z "$HIDDIFY_DIR" ] || [ ! -d "$HIDDIFY_DIR" ]; then
+    echo -e "${RED}HiddifyPanel directory not found${NC}"
+    echo "Please specify the HiddifyPanel directory:"
+    echo "  export HIDDIFY_DIR=/path/to/hiddify-panel"
+    echo "  or edit this script and set HIDDIFY_DIR manually"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Found HiddifyPanel at $HIDDIFY_DIR${NC}"
 
 # Check if virtual environment exists
-VENV_DIR="$HIDDIFY_DIR/.venv313"
-if [ ! -d "$VENV_DIR" ]; then
-    VENV_DIR="$HIDDIFY_DIR/.venv"
-    if [ ! -d "$VENV_DIR" ]; then
-        echo -e "${RED}Virtual environment not found${NC}"
-        exit 1
+VENV_DIR=""
+
+# Try to find venv from systemd service
+if [ -f "/etc/systemd/system/hiddify-panel.service" ]; then
+    EXEC_START=$(grep "^ExecStart=" /etc/systemd/system/hiddify-panel.service | cut -d'=' -f2 | cut -d' ' -f1)
+    if [ -n "$EXEC_START" ] && [ -f "$EXEC_START" ]; then
+        VENV_DIR=$(dirname $(dirname "$EXEC_START"))
+        if [ ! -d "$VENV_DIR" ]; then
+            VENV_DIR=""
+        fi
     fi
+fi
+
+# Try common venv paths
+if [ -z "$VENV_DIR" ]; then
+    for venv_path in "$HIDDIFY_DIR/.venv313" "$HIDDIFY_DIR/.venv" "/opt/hiddify-manager/.venv313" "/opt/hiddify-manager/.venv"; do
+        if [ -d "$venv_path" ] && [ -f "$venv_path/bin/activate" ]; then
+            VENV_DIR="$venv_path"
+            break
+        fi
+    done
+fi
+
+if [ -z "$VENV_DIR" ] || [ ! -d "$VENV_DIR" ]; then
+    echo -e "${YELLOW}⚠ Virtual environment not found, trying system Python${NC}"
+    VENV_DIR=""
+else
+    echo -e "${GREEN}✓ Found virtual environment at $VENV_DIR${NC}"
 fi
 
 echo -e "${GREEN}✓ Found virtual environment at $VENV_DIR${NC}"
 
-# Activate virtual environment
-source "$VENV_DIR/bin/activate"
+# Activate virtual environment if found
+if [ -n "$VENV_DIR" ]; then
+    source "$VENV_DIR/bin/activate"
+    PYTHON_CMD="python3"
+    PIP_CMD="pip"
+else
+    PYTHON_CMD="python3"
+    PIP_CMD="pip3"
+fi
 
 # Check Python version
 PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo -e "${GREEN}✓ Python version: $PYTHON_VERSION${NC}"
 
-# Install from source
+# Install from source (if source directory exists)
 echo ""
-echo "Step 1: Installing from source..."
+echo "Step 1: Checking HiddifyPanel installation..."
 cd "$HIDDIFY_DIR"
-pip install -e . || {
-    echo -e "${RED}✗ Failed to install from source${NC}"
-    exit 1
-}
-echo -e "${GREEN}✓ Installed from source${NC}"
+
+# Check if this is a source directory
+if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -d "hiddifypanel" ]; then
+    echo "Installing from source..."
+    $PIP_CMD install -e . || {
+        echo -e "${YELLOW}⚠ Failed to install from source, trying pip install${NC}"
+        $PIP_CMD install . || {
+            echo -e "${RED}✗ Failed to install${NC}"
+            exit 1
+        }
+    }
+    echo -e "${GREEN}✓ Installed from source${NC}"
+else
+    echo -e "${YELLOW}⚠ Not a source directory, skipping source installation${NC}"
+    echo "HiddifyPanel seems to be installed via pip"
+fi
 
 # Run database migration
 echo ""
