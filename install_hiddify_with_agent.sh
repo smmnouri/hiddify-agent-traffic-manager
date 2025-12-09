@@ -22,13 +22,16 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Configuration
-HIDDIFY_REPO="${HIDDIFY_REPO:-https://github.com/smmnouri/hiddify-panel.git}"
+# Try SSH first, fallback to HTTPS
+HIDDIFY_REPO_SSH="${HIDDIFY_REPO_SSH:-git@github.com:smmnouri/hiddify-panel.git}"
+HIDDIFY_REPO_HTTPS="${HIDDIFY_REPO_HTTPS:-https://github.com/smmnouri/hiddify-panel.git}"
 HIDDIFY_BRANCH="${HIDDIFY_BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 AGENT_REPO="https://github.com/smmnouri/hiddify-agent-traffic-manager.git"
 
 echo "Configuration:"
-echo "  HiddifyPanel Repo: $HIDDIFY_REPO"
+echo "  HiddifyPanel Repo (SSH): $HIDDIFY_REPO_SSH"
+echo "  HiddifyPanel Repo (HTTPS): $HIDDIFY_REPO_HTTPS"
 echo "  Branch: $HIDDIFY_BRANCH"
 echo "  Install Directory: $INSTALL_DIR"
 echo ""
@@ -67,13 +70,40 @@ if [ -d "hiddify-panel" ]; then
         echo -e "${YELLOW}⚠ Could not pull, using existing${NC}"
     }
 else
-    git clone -b "$HIDDIFY_BRANCH" "$HIDDIFY_REPO" hiddify-panel || {
-        echo -e "${RED}✗ Failed to clone HiddifyPanel${NC}"
-        exit 1
-    }
-    cd hiddify-panel
+    # Try SSH first (if SSH key is configured)
+    if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+        echo "  Trying SSH..."
+        git clone -b "$HIDDIFY_BRANCH" "$HIDDIFY_REPO_SSH" hiddify-panel 2>/dev/null && {
+            cd hiddify-panel
+            echo -e "${GREEN}✓ HiddifyPanel cloned via SSH${NC}"
+        } || {
+            echo "  SSH failed, trying HTTPS without credentials..."
+            # Use HTTPS without credentials (for public repos)
+            GIT_TERMINAL_PROMPT=0 git clone -b "$HIDDIFY_BRANCH" "$HIDDIFY_REPO_HTTPS" hiddify-panel || {
+                echo -e "${RED}✗ Failed to clone HiddifyPanel${NC}"
+                echo "Please check:"
+                echo "  1. Repository is public, or"
+                echo "  2. SSH key is configured, or"
+                echo "  3. Use: export HIDDIFY_REPO_HTTPS='https://USERNAME:TOKEN@github.com/smmnouri/hiddify-panel.git'"
+                exit 1
+            }
+            cd hiddify-panel
+            echo -e "${GREEN}✓ HiddifyPanel cloned via HTTPS${NC}"
+        }
+    else
+        echo "  Trying HTTPS (public repo)..."
+        # Disable credential prompts for public repos
+        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git clone -b "$HIDDIFY_BRANCH" "$HIDDIFY_REPO_HTTPS" hiddify-panel || {
+            echo -e "${RED}✗ Failed to clone HiddifyPanel${NC}"
+            echo "If repository is private, use one of these:"
+            echo "  1. Setup SSH key: ssh-keygen -t ed25519 -C 'your_email@example.com'"
+            echo "  2. Use token: export HIDDIFY_REPO_HTTPS='https://USERNAME:TOKEN@github.com/smmnouri/hiddify-panel.git'"
+            exit 1
+        }
+        cd hiddify-panel
+        echo -e "${GREEN}✓ HiddifyPanel cloned${NC}"
+    fi
 fi
-echo -e "${GREEN}✓ HiddifyPanel cloned${NC}"
 
 # Step 4: Setup Python virtual environment
 echo ""
