@@ -22,9 +22,10 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Configuration
-# Try SSH first, fallback to HTTPS
-HIDDIFY_REPO_SSH="${HIDDIFY_REPO_SSH:-git@github.com:smmnouri/hiddify-panel.git}"
-HIDDIFY_REPO_HTTPS="${HIDDIFY_REPO_HTTPS:-https://github.com/smmnouri/hiddify-panel.git}"
+# Default to official HiddifyPanel repository
+# You can override with: export HIDDIFY_REPO_HTTPS="https://github.com/YOUR_USERNAME/YOUR_REPO.git"
+HIDDIFY_REPO_SSH="${HIDDIFY_REPO_SSH:-git@github.com:hiddify/HiddifyPanel.git}"
+HIDDIFY_REPO_HTTPS="${HIDDIFY_REPO_HTTPS:-https://github.com/hiddify/HiddifyPanel.git}"
 HIDDIFY_BRANCH="${HIDDIFY_BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 AGENT_REPO="https://github.com/smmnouri/hiddify-agent-traffic-manager.git"
@@ -34,6 +35,10 @@ echo "  HiddifyPanel Repo (SSH): $HIDDIFY_REPO_SSH"
 echo "  HiddifyPanel Repo (HTTPS): $HIDDIFY_REPO_HTTPS"
 echo "  Branch: $HIDDIFY_BRANCH"
 echo "  Install Directory: $INSTALL_DIR"
+echo ""
+echo "Note: Using official HiddifyPanel repository by default."
+echo "To use your own repository, set:"
+echo "  export HIDDIFY_REPO_HTTPS='https://github.com/YOUR_USERNAME/YOUR_REPO.git'"
 echo ""
 
 # Step 1: Install prerequisites
